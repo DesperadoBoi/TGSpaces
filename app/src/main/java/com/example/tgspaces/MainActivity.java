@@ -104,7 +104,7 @@ public class MainActivity extends AppCompatActivity {
     private final String[] slotNames = new String[10];
 
     private final String[] packageNames = {
-            "org.telegram.messenger",
+            "com.desperadoboi.tgclone01",
             "com.desperadoboi.tgclone02",
             "com.desperadoboi.tgclone03",
             "com.desperadoboi.tgclone04",
