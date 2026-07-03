@@ -4,6 +4,7 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="#111827"
     tools:context=".MainActivity">
 
     <LinearLayout
@@ -17,6 +18,7 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
             android:text="TGSpaces"
+            android:textColor="#F9FAFB"
             android:textSize="26sp"
             android:textStyle="bold" />
 
@@ -31,7 +33,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:background="#EEEEEE"
+            android:background="@drawable/slot_card_background"
             android:orientation="vertical"
             android:padding="12dp">
 
@@ -40,7 +42,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Telegram 01"
-                android:textSize="18sp"
+                android:textColor="#F9FAFB"
+                android:textSize="21sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -48,6 +51,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
+                android:textColor="#FCA5A5"
                 android:text="Не установлено" />
 
             <Button
@@ -68,7 +72,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:background="#EEEEEE"
+            android:background="@drawable/slot_card_background"
             android:orientation="vertical"
             android:padding="12dp">
 
@@ -77,7 +81,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Telegram 02"
-                android:textSize="18sp"
+                android:textColor="#F9FAFB"
+                android:textSize="21sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -85,6 +90,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
+                android:textColor="#FCA5A5"
                 android:text="Не установлено" />
 
             <Button
@@ -105,7 +111,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:background="#EEEEEE"
+            android:background="@drawable/slot_card_background"
             android:orientation="vertical"
             android:padding="12dp">
 
@@ -114,7 +120,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Telegram 03"
-                android:textSize="18sp"
+                android:textColor="#F9FAFB"
+                android:textSize="21sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -122,6 +129,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
+                android:textColor="#FCA5A5"
                 android:text="Не установлено" />
 
             <Button
@@ -142,7 +150,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:background="#EEEEEE"
+            android:background="@drawable/slot_card_background"
             android:orientation="vertical"
             android:padding="12dp">
 
@@ -151,7 +159,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Telegram 04"
-                android:textSize="18sp"
+                android:textColor="#F9FAFB"
+                android:textSize="21sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -159,6 +168,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
+                android:textColor="#FCA5A5"
                 android:text="Не установлено" />
 
             <Button
@@ -179,7 +189,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:background="#EEEEEE"
+            android:background="@drawable/slot_card_background"
             android:orientation="vertical"
             android:padding="12dp">
 
@@ -188,7 +198,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Telegram 05"
-                android:textSize="18sp"
+                android:textColor="#F9FAFB"
+                android:textSize="21sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -196,6 +207,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
+                android:textColor="#FCA5A5"
                 android:text="Не установлено" />
 
             <Button
@@ -216,7 +228,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:background="#EEEEEE"
+            android:background="@drawable/slot_card_background"
             android:orientation="vertical"
             android:padding="12dp">
 
@@ -225,7 +237,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Telegram 06"
-                android:textSize="18sp"
+                android:textColor="#F9FAFB"
+                android:textSize="21sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -233,6 +246,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
+                android:textColor="#FCA5A5"
                 android:text="Не установлено" />
 
             <Button
@@ -253,7 +267,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:background="#EEEEEE"
+            android:background="@drawable/slot_card_background"
             android:orientation="vertical"
             android:padding="12dp">
 
@@ -262,7 +276,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Telegram 07"
-                android:textSize="18sp"
+                android:textColor="#F9FAFB"
+                android:textSize="21sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -270,6 +285,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
+                android:textColor="#FCA5A5"
                 android:text="Не установлено" />
 
             <Button
@@ -290,7 +306,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:background="#EEEEEE"
+            android:background="@drawable/slot_card_background"
             android:orientation="vertical"
             android:padding="12dp">
 
@@ -299,7 +315,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Telegram 08"
-                android:textSize="18sp"
+                android:textColor="#F9FAFB"
+                android:textSize="21sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -307,6 +324,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
+                android:textColor="#FCA5A5"
                 android:text="Не установлено" />
 
             <Button
@@ -327,7 +345,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:background="#EEEEEE"
+            android:background="@drawable/slot_card_background"
             android:orientation="vertical"
             android:padding="12dp">
 
@@ -336,7 +354,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Telegram 09"
-                android:textSize="18sp"
+                android:textColor="#F9FAFB"
+                android:textSize="21sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -344,6 +363,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
+                android:textColor="#FCA5A5"
                 android:text="Не установлено" />
 
             <Button
@@ -363,7 +383,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="#EEEEEE"
+            android:background="@drawable/slot_card_background"
             android:orientation="vertical"
             android:padding="12dp">
 
@@ -372,7 +392,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Telegram 10"
-                android:textSize="18sp"
+                android:textColor="#F9FAFB"
+                android:textSize="21sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -380,6 +401,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
+                android:textColor="#FCA5A5"
                 android:text="Не установлено" />
 
             <Button

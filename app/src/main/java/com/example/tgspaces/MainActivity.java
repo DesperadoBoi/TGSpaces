@@ -3,6 +3,7 @@ package com.example.tgspaces;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.widget.Button;
 import android.widget.EditText;
@@ -178,8 +179,10 @@ public class MainActivity extends AppCompatActivity {
 
             if (isAppInstalled(packageNames[i])) {
                 statusText.setText("Установлено");
+                statusText.setTextColor(Color.parseColor("#86EFAC"));
             } else {
                 statusText.setText("Не установлено");
+                statusText.setTextColor(Color.parseColor("#FCA5A5"));
             }
         }
     }
