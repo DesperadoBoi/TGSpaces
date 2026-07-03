@@ -186,6 +186,11 @@ public class MainActivity extends AppCompatActivity {
                     preferences.edit().putString("slot_name_" + index, newName).apply();
                     updateSlotTitles();
                 })
+                .setNeutralButton("Сбросить", (dialog, which) -> {
+                    slotNames[index] = defaultSlotNames[index];
+                    preferences.edit().remove("slot_name_" + index).apply();
+                    updateSlotTitles();
+                })
                 .setNegativeButton("Отмена", null)
                 .show();
     }
