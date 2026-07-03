@@ -2,6 +2,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <queries>
+        <package android:name="com.desperadoboi.tgclone01" />
+        <package android:name="com.desperadoboi.tgclone02" />
+        <package android:name="com.desperadoboi.tgclone03" />
+        <package android:name="com.desperadoboi.tgclone04" />
+        <package android:name="com.desperadoboi.tgclone05" />
+        <package android:name="com.desperadoboi.tgclone06" />
+        <package android:name="com.desperadoboi.tgclone07" />
+        <package android:name="com.desperadoboi.tgclone08" />
+        <package android:name="com.desperadoboi.tgclone09" />
+        <package android:name="com.desperadoboi.tgclone10" />
+    </queries>
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"

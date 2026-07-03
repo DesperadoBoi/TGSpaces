@@ -36,6 +36,7 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/statusTelegram01"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
@@ -65,6 +66,7 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/statusTelegram02"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
@@ -94,6 +96,7 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/statusTelegram03"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
@@ -123,6 +126,7 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/statusTelegram04"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
@@ -152,6 +156,7 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/statusTelegram05"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
@@ -181,6 +186,7 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/statusTelegram06"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
@@ -210,6 +216,7 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/statusTelegram07"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
@@ -239,6 +246,7 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/statusTelegram08"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
@@ -268,6 +276,7 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/statusTelegram09"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
@@ -296,6 +305,7 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/statusTelegram10"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
