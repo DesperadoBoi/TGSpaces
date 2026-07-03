@@ -4,7 +4,9 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -58,6 +60,19 @@ public class MainActivity extends AppCompatActivity {
             R.id.buttonRename08,
             R.id.buttonRename09,
             R.id.buttonRename10
+    };
+
+    private final int[] settingsButtonIds = {
+            R.id.buttonSettings01,
+            R.id.buttonSettings02,
+            R.id.buttonSettings03,
+            R.id.buttonSettings04,
+            R.id.buttonSettings05,
+            R.id.buttonSettings06,
+            R.id.buttonSettings07,
+            R.id.buttonSettings08,
+            R.id.buttonSettings09,
+            R.id.buttonSettings10
     };
 
     private final int[] statusIds = {
@@ -122,10 +137,12 @@ public class MainActivity extends AppCompatActivity {
         for (int i = 0; i < buttonIds.length; i++) {
             Button button = findViewById(buttonIds[i]);
             Button renameButton = findViewById(renameButtonIds[i]);
+            Button settingsButton = findViewById(settingsButtonIds[i]);
             int index = i;
 
             button.setOnClickListener(view -> openSlot(index));
             renameButton.setOnClickListener(view -> showRenameDialog(index));
+            settingsButton.setOnClickListener(view -> openAppSettings(index));
         }
 
         updateStatuses();
@@ -199,6 +216,19 @@ public class MainActivity extends AppCompatActivity {
             } else {
                 Toast.makeText(this, "Слот " + slotName + " не установлен", Toast.LENGTH_SHORT).show();
             }
+        } else {
+            Toast.makeText(this, "Слот " + slotName + " не установлен", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void openAppSettings(int index) {
+        String slotName = slotNames[index];
+        String packageName = packageNames[index];
+
+        if (isAppInstalled(packageName)) {
+            Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(Uri.parse("package:" + packageName));
+            startActivity(intent);
         } else {
             Toast.makeText(this, "Слот " + slotName + " не установлен", Toast.LENGTH_SHORT).show();
         }

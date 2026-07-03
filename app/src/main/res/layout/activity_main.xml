@@ -66,6 +66,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Переименовать" />
+
+            <Button
+                android:id="@+id/buttonSettings01"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Настройки" />
         </LinearLayout>
 
         <LinearLayout
@@ -105,6 +111,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Переименовать" />
+
+            <Button
+                android:id="@+id/buttonSettings02"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Настройки" />
         </LinearLayout>
 
         <LinearLayout
@@ -144,6 +156,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Переименовать" />
+
+            <Button
+                android:id="@+id/buttonSettings03"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Настройки" />
         </LinearLayout>
 
         <LinearLayout
@@ -183,6 +201,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Переименовать" />
+
+            <Button
+                android:id="@+id/buttonSettings04"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Настройки" />
         </LinearLayout>
 
         <LinearLayout
@@ -222,6 +246,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Переименовать" />
+
+            <Button
+                android:id="@+id/buttonSettings05"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Настройки" />
         </LinearLayout>
 
         <LinearLayout
@@ -261,6 +291,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Переименовать" />
+
+            <Button
+                android:id="@+id/buttonSettings06"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Настройки" />
         </LinearLayout>
 
         <LinearLayout
@@ -300,6 +336,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Переименовать" />
+
+            <Button
+                android:id="@+id/buttonSettings07"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Настройки" />
         </LinearLayout>
 
         <LinearLayout
@@ -339,6 +381,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Переименовать" />
+
+            <Button
+                android:id="@+id/buttonSettings08"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Настройки" />
         </LinearLayout>
 
         <LinearLayout
@@ -378,6 +426,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Переименовать" />
+
+            <Button
+                android:id="@+id/buttonSettings09"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Настройки" />
         </LinearLayout>
 
         <LinearLayout
@@ -416,6 +470,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Переименовать" />
+
+            <Button
+                android:id="@+id/buttonSettings10"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Настройки" />
         </LinearLayout>
     </LinearLayout>
 </ScrollView>
