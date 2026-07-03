@@ -1,19 +1,37 @@
 package com.example.tgspaces;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 public class MainActivity extends AppCompatActivity {
+
+    private SharedPreferences preferences;
+
+    private final int[] titleIds = {
+            R.id.titleTelegram01,
+            R.id.titleTelegram02,
+            R.id.titleTelegram03,
+            R.id.titleTelegram04,
+            R.id.titleTelegram05,
+            R.id.titleTelegram06,
+            R.id.titleTelegram07,
+            R.id.titleTelegram08,
+            R.id.titleTelegram09,
+            R.id.titleTelegram10
+    };
 
     private final int[] buttonIds = {
             R.id.buttonTelegram01,
@@ -26,6 +44,19 @@ public class MainActivity extends AppCompatActivity {
             R.id.buttonTelegram08,
             R.id.buttonTelegram09,
             R.id.buttonTelegram10
+    };
+
+    private final int[] renameButtonIds = {
+            R.id.buttonRename01,
+            R.id.buttonRename02,
+            R.id.buttonRename03,
+            R.id.buttonRename04,
+            R.id.buttonRename05,
+            R.id.buttonRename06,
+            R.id.buttonRename07,
+            R.id.buttonRename08,
+            R.id.buttonRename09,
+            R.id.buttonRename10
     };
 
     private final int[] statusIds = {
@@ -41,7 +72,7 @@ public class MainActivity extends AppCompatActivity {
             R.id.statusTelegram10
     };
 
-    private final String[] slotNames = {
+    private final String[] defaultSlotNames = {
             "Telegram 01",
             "Telegram 02",
             "Telegram 03",
@@ -53,6 +84,8 @@ public class MainActivity extends AppCompatActivity {
             "Telegram 09",
             "Telegram 10"
     };
+
+    private final String[] slotNames = new String[10];
 
     private final String[] packageNames = {
             "org.telegram.messenger",
@@ -78,14 +111,20 @@ public class MainActivity extends AppCompatActivity {
             return insets;
         });
 
+        preferences = getSharedPreferences("slot_names", MODE_PRIVATE);
+        loadSlotNames();
+        updateSlotTitles();
+
         Button refreshButton = findViewById(R.id.buttonRefresh);
         refreshButton.setOnClickListener(view -> updateStatuses());
 
         for (int i = 0; i < buttonIds.length; i++) {
             Button button = findViewById(buttonIds[i]);
+            Button renameButton = findViewById(renameButtonIds[i]);
             int index = i;
 
             button.setOnClickListener(view -> openSlot(index));
+            renameButton.setOnClickListener(view -> showRenameDialog(index));
         }
 
         updateStatuses();
@@ -95,6 +134,42 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         updateStatuses();
+    }
+
+    private void loadSlotNames() {
+        for (int i = 0; i < slotNames.length; i++) {
+            slotNames[i] = preferences.getString("slot_name_" + i, defaultSlotNames[i]);
+        }
+    }
+
+    private void updateSlotTitles() {
+        for (int i = 0; i < titleIds.length; i++) {
+            TextView titleText = findViewById(titleIds[i]);
+            titleText.setText(slotNames[i]);
+        }
+    }
+
+    private void showRenameDialog(int index) {
+        EditText editText = new EditText(this);
+        editText.setText(slotNames[index]);
+        editText.setSelection(editText.getText().length());
+
+        new AlertDialog.Builder(this)
+                .setTitle("Переименовать слот")
+                .setView(editText)
+                .setPositiveButton("Сохранить", (dialog, which) -> {
+                    String newName = editText.getText().toString().trim();
+
+                    if (newName.isEmpty()) {
+                        newName = defaultSlotNames[index];
+                    }
+
+                    slotNames[index] = newName;
+                    preferences.edit().putString("slot_name_" + index, newName).apply();
+                    updateSlotTitles();
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
     }
 
     private void updateStatuses() {

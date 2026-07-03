@@ -36,6 +36,7 @@
             android:padding="12dp">
 
             <TextView
+                android:id="@+id/titleTelegram01"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Telegram 01"
@@ -55,6 +56,12 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="Открыть" />
+
+            <Button
+                android:id="@+id/buttonRename01"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Переименовать" />
         </LinearLayout>
 
         <LinearLayout
@@ -66,6 +73,7 @@
             android:padding="12dp">
 
             <TextView
+                android:id="@+id/titleTelegram02"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Telegram 02"
@@ -85,6 +93,12 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="Открыть" />
+
+            <Button
+                android:id="@+id/buttonRename02"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Переименовать" />
         </LinearLayout>
 
         <LinearLayout
@@ -96,6 +110,7 @@
             android:padding="12dp">
 
             <TextView
+                android:id="@+id/titleTelegram03"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Telegram 03"
@@ -115,6 +130,12 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="Открыть" />
+
+            <Button
+                android:id="@+id/buttonRename03"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Переименовать" />
         </LinearLayout>
 
         <LinearLayout
@@ -126,6 +147,7 @@
             android:padding="12dp">
 
             <TextView
+                android:id="@+id/titleTelegram04"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Telegram 04"
@@ -145,6 +167,12 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="Открыть" />
+
+            <Button
+                android:id="@+id/buttonRename04"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Переименовать" />
         </LinearLayout>
 
         <LinearLayout
@@ -156,6 +184,7 @@
             android:padding="12dp">
 
             <TextView
+                android:id="@+id/titleTelegram05"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Telegram 05"
@@ -175,6 +204,12 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="Открыть" />
+
+            <Button
+                android:id="@+id/buttonRename05"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Переименовать" />
         </LinearLayout>
 
         <LinearLayout
@@ -186,6 +221,7 @@
             android:padding="12dp">
 
             <TextView
+                android:id="@+id/titleTelegram06"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Telegram 06"
@@ -205,6 +241,12 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="Открыть" />
+
+            <Button
+                android:id="@+id/buttonRename06"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Переименовать" />
         </LinearLayout>
 
         <LinearLayout
@@ -216,6 +258,7 @@
             android:padding="12dp">
 
             <TextView
+                android:id="@+id/titleTelegram07"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Telegram 07"
@@ -235,6 +278,12 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="Открыть" />
+
+            <Button
+                android:id="@+id/buttonRename07"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Переименовать" />
         </LinearLayout>
 
         <LinearLayout
@@ -246,6 +295,7 @@
             android:padding="12dp">
 
             <TextView
+                android:id="@+id/titleTelegram08"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Telegram 08"
@@ -265,6 +315,12 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="Открыть" />
+
+            <Button
+                android:id="@+id/buttonRename08"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Переименовать" />
         </LinearLayout>
 
         <LinearLayout
@@ -276,6 +332,7 @@
             android:padding="12dp">
 
             <TextView
+                android:id="@+id/titleTelegram09"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Telegram 09"
@@ -295,6 +352,12 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="Открыть" />
+
+            <Button
+                android:id="@+id/buttonRename09"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Переименовать" />
         </LinearLayout>
 
         <LinearLayout
@@ -305,6 +368,7 @@
             android:padding="12dp">
 
             <TextView
+                android:id="@+id/titleTelegram10"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Telegram 10"
@@ -324,6 +388,12 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="Открыть" />
+
+            <Button
+                android:id="@+id/buttonRename10"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Переименовать" />
         </LinearLayout>
     </LinearLayout>
 </ScrollView>
