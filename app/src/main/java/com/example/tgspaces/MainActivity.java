@@ -66,7 +66,7 @@ public class MainActivity extends AppCompatActivity {
         };
 
         String[] packageNames = {
-                "com.desperadoboi.tgclone01",
+                "org.telegram.messenger",
                 "com.desperadoboi.tgclone02",
                 "com.desperadoboi.tgclone03",
                 "com.desperadoboi.tgclone04",

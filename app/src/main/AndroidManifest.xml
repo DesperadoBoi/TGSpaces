@@ -3,6 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <queries>
+        <package android:name="org.telegram.messenger" />
         <package android:name="com.desperadoboi.tgclone01" />
         <package android:name="com.desperadoboi.tgclone02" />
         <package android:name="com.desperadoboi.tgclone03" />
