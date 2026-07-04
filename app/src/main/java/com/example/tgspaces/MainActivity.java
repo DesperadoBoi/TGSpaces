@@ -1,119 +1,68 @@
 package com.example.tgspaces;
 
+import android.app.DownloadManager;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.Settings;
+import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.FileProvider;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import java.io.File;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+
 public class MainActivity extends AppCompatActivity {
 
+    private static final String PREFS_NAME = "slot_names";
+    private static final String KEY_SLOT_COUNT = "slot_count";
+    private static final String KEY_PENDING_APK = "pending_apk_path";
+    private static final String KEY_DOWNLOAD_SLOT_PREFIX = "download_slot_";
+    private static final int MAX_CLONE_APKS = 10;
+    private static final String RELEASE_BASE_URL = "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.1-debug/";
+
+    private final Map<Long, Integer> downloadSlots = new HashMap<>();
     private SharedPreferences preferences;
+    private LinearLayout slotsContainer;
+    private int visibleSlotCount = 1;
 
-    private final int[] titleIds = {
-            R.id.titleTelegram01,
-            R.id.titleTelegram02,
-            R.id.titleTelegram03,
-            R.id.titleTelegram04,
-            R.id.titleTelegram05,
-            R.id.titleTelegram06,
-            R.id.titleTelegram07,
-            R.id.titleTelegram08,
-            R.id.titleTelegram09,
-            R.id.titleTelegram10
-    };
-
-    private final int[] buttonIds = {
-            R.id.buttonTelegram01,
-            R.id.buttonTelegram02,
-            R.id.buttonTelegram03,
-            R.id.buttonTelegram04,
-            R.id.buttonTelegram05,
-            R.id.buttonTelegram06,
-            R.id.buttonTelegram07,
-            R.id.buttonTelegram08,
-            R.id.buttonTelegram09,
-            R.id.buttonTelegram10
-    };
-
-    private final int[] renameButtonIds = {
-            R.id.buttonRename01,
-            R.id.buttonRename02,
-            R.id.buttonRename03,
-            R.id.buttonRename04,
-            R.id.buttonRename05,
-            R.id.buttonRename06,
-            R.id.buttonRename07,
-            R.id.buttonRename08,
-            R.id.buttonRename09,
-            R.id.buttonRename10
-    };
-
-    private final int[] settingsButtonIds = {
-            R.id.buttonSettings01,
-            R.id.buttonSettings02,
-            R.id.buttonSettings03,
-            R.id.buttonSettings04,
-            R.id.buttonSettings05,
-            R.id.buttonSettings06,
-            R.id.buttonSettings07,
-            R.id.buttonSettings08,
-            R.id.buttonSettings09,
-            R.id.buttonSettings10
-    };
-
-    private final int[] statusIds = {
-            R.id.statusTelegram01,
-            R.id.statusTelegram02,
-            R.id.statusTelegram03,
-            R.id.statusTelegram04,
-            R.id.statusTelegram05,
-            R.id.statusTelegram06,
-            R.id.statusTelegram07,
-            R.id.statusTelegram08,
-            R.id.statusTelegram09,
-            R.id.statusTelegram10
-    };
-
-    private final String[] defaultSlotNames = {
-            "Telegram 01",
-            "Telegram 02",
-            "Telegram 03",
-            "Telegram 04",
-            "Telegram 05",
-            "Telegram 06",
-            "Telegram 07",
-            "Telegram 08",
-            "Telegram 09",
-            "Telegram 10"
-    };
-
-    private final String[] slotNames = new String[10];
-
-    private final String[] packageNames = {
-            "com.desperadoboi.tgclone01",
-            "com.desperadoboi.tgclone02",
-            "com.desperadoboi.tgclone03",
-            "com.desperadoboi.tgclone04",
-            "com.desperadoboi.tgclone05",
-            "com.desperadoboi.tgclone06",
-            "com.desperadoboi.tgclone07",
-            "com.desperadoboi.tgclone08",
-            "com.desperadoboi.tgclone09",
-            "com.desperadoboi.tgclone10"
+    private final BroadcastReceiver downloadReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            long downloadId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L);
+            Integer slot = downloadSlots.remove(downloadId);
+            if (slot == null) {
+                int savedSlot = preferences.getInt(downloadSlotKey(downloadId), 0);
+                slot = savedSlot > 0 ? savedSlot : null;
+            }
+            if (slot != null) {
+                preferences.edit().remove(downloadSlotKey(downloadId)).apply();
+                handleDownloadedApk(downloadId, slot);
+            }
+        }
     };
 
     @Override
@@ -127,49 +76,155 @@ public class MainActivity extends AppCompatActivity {
             return insets;
         });
 
-        preferences = getSharedPreferences("slot_names", MODE_PRIVATE);
-        loadSlotNames();
-        updateSlotTitles();
+        preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        slotsContainer = findViewById(R.id.slotsContainer);
 
-        Button refreshButton = findViewById(R.id.buttonRefresh);
-        refreshButton.setOnClickListener(view -> updateStatuses());
+        findViewById(R.id.buttonAddSlot).setOnClickListener(view -> addSlot());
+        findViewById(R.id.buttonRefresh).setOnClickListener(view -> renderSlots());
 
-        for (int i = 0; i < buttonIds.length; i++) {
-            Button button = findViewById(buttonIds[i]);
-            Button renameButton = findViewById(renameButtonIds[i]);
-            Button settingsButton = findViewById(settingsButtonIds[i]);
-            int index = i;
-
-            button.setOnClickListener(view -> openSlot(index));
-            renameButton.setOnClickListener(view -> showRenameDialog(index));
-            settingsButton.setOnClickListener(view -> openAppSettings(index));
+        IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(downloadReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(downloadReceiver, filter);
         }
 
-        updateStatuses();
+        renderSlots();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        updateStatuses();
+        tryOpenPendingInstaller();
+        renderSlots();
     }
 
-    private void loadSlotNames() {
-        for (int i = 0; i < slotNames.length; i++) {
-            slotNames[i] = preferences.getString("slot_name_" + i, defaultSlotNames[i]);
+    @Override
+    protected void onDestroy() {
+        unregisterReceiver(downloadReceiver);
+        super.onDestroy();
+    }
+
+    private void renderSlots() {
+        int savedSlotCount = Math.max(1, preferences.getInt(KEY_SLOT_COUNT, 1));
+        visibleSlotCount = Math.min(MAX_CLONE_APKS, Math.max(savedSlotCount, highestInstalledSlot()));
+        if (visibleSlotCount != savedSlotCount) {
+            preferences.edit().putInt(KEY_SLOT_COUNT, visibleSlotCount).apply();
+        }
+
+        slotsContainer.removeAllViews();
+        for (int slot = 1; slot <= visibleSlotCount; slot++) {
+            slotsContainer.addView(createSlotCard(slot));
         }
     }
 
-    private void updateSlotTitles() {
-        for (int i = 0; i < titleIds.length; i++) {
-            TextView titleText = findViewById(titleIds[i]);
-            titleText.setText(slotNames[i]);
+    private View createSlotCard(int slot) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(12), dp(12), dp(12), dp(12));
+        card.setBackgroundResource(R.drawable.slot_card_background);
+
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        cardParams.setMargins(0, 0, 0, dp(12));
+        card.setLayoutParams(cardParams);
+
+        boolean installed = isAppInstalled(packageName(slot));
+
+        TextView title = new TextView(this);
+        title.setText(slotName(slot));
+        title.setTextColor(Color.parseColor("#F9FAFB"));
+        title.setTextSize(21);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        card.addView(title);
+
+        TextView status = new TextView(this);
+        LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        statusParams.topMargin = dp(4);
+        status.setLayoutParams(statusParams);
+        status.setText(installed ? "Установлено" : "Не установлен");
+        status.setTextColor(Color.parseColor(installed ? "#86EFAC" : "#FCA5A5"));
+        status.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        card.addView(status);
+
+        if (installed) {
+            card.addView(createButton("Открыть", true, view -> openSlot(slot)));
+            card.addView(createButton("Настройки", false, view -> openAppSettings(slot)));
+        } else {
+            card.addView(createButton("Установить клон", true, view -> showInstallDialog(slot)));
         }
+        card.addView(createButton("Переименовать", false, view -> showRenameDialog(slot)));
+
+        return card;
     }
 
-    private void showRenameDialog(int index) {
+    private Button createButton(String text, boolean primary, View.OnClickListener listener) {
+        Button button = new Button(this);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        params.topMargin = dp(8);
+        button.setLayoutParams(params);
+        button.setText(text);
+        button.setAllCaps(false);
+        button.setTypeface(Typeface.DEFAULT, primary ? Typeface.BOLD : Typeface.NORMAL);
+        button.setOnClickListener(listener);
+        return button;
+    }
+
+    private void addSlot() {
+        int emptySlot = firstVisibleEmptySlot();
+        if (emptySlot > 0) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Пустой слот уже есть")
+                    .setMessage("У вас уже есть пустой слот: " + defaultSlotName(emptySlot) + ". Сначала установите клон в него.")
+                    .setPositiveButton("OK", null)
+                    .show();
+            return;
+        }
+
+        if (visibleSlotCount >= MAX_CLONE_APKS) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Слоты закончились")
+                    .setMessage("Сейчас доступно максимум " + MAX_CLONE_APKS + " clone APK.")
+                    .setPositiveButton("OK", null)
+                    .show();
+            return;
+        }
+
+        preferences.edit().putInt(KEY_SLOT_COUNT, visibleSlotCount + 1).apply();
+        renderSlots();
+    }
+
+    private int firstVisibleEmptySlot() {
+        for (int slot = 1; slot <= visibleSlotCount; slot++) {
+            if (!isAppInstalled(packageName(slot))) {
+                return slot;
+            }
+        }
+        return 0;
+    }
+
+    private int highestInstalledSlot() {
+        int highest = 0;
+        for (int slot = 1; slot <= MAX_CLONE_APKS; slot++) {
+            if (isAppInstalled(packageName(slot))) {
+                highest = slot;
+            }
+        }
+        return highest;
+    }
+
+    private void showRenameDialog(int slot) {
         EditText editText = new EditText(this);
-        editText.setText(slotNames[index]);
+        editText.setSingleLine(true);
+        editText.setText(slotName(slot));
         editText.setSelection(editText.getText().length());
 
         new AlertDialog.Builder(this)
@@ -177,66 +232,141 @@ public class MainActivity extends AppCompatActivity {
                 .setView(editText)
                 .setPositiveButton("Сохранить", (dialog, which) -> {
                     String newName = editText.getText().toString().trim();
-
+                    SharedPreferences.Editor editor = preferences.edit();
                     if (newName.isEmpty()) {
-                        newName = defaultSlotNames[index];
+                        editor.remove(slotNameKey(slot));
+                    } else {
+                        editor.putString(slotNameKey(slot), newName);
                     }
-
-                    slotNames[index] = newName;
-                    preferences.edit().putString("slot_name_" + index, newName).apply();
-                    updateSlotTitles();
+                    editor.apply();
+                    renderSlots();
                 })
                 .setNeutralButton("Сбросить", (dialog, which) -> {
-                    slotNames[index] = defaultSlotNames[index];
-                    preferences.edit().remove("slot_name_" + index).apply();
-                    updateSlotTitles();
+                    preferences.edit().remove(slotNameKey(slot)).apply();
+                    renderSlots();
                 })
                 .setNegativeButton("Отмена", null)
                 .show();
     }
 
-    private void updateStatuses() {
-        for (int i = 0; i < statusIds.length; i++) {
-            TextView statusText = findViewById(statusIds[i]);
-
-            if (isAppInstalled(packageNames[i])) {
-                statusText.setText("Установлено");
-                statusText.setTextColor(Color.parseColor("#86EFAC"));
-            } else {
-                statusText.setText("Не установлено");
-                statusText.setTextColor(Color.parseColor("#FCA5A5"));
-            }
-        }
-    }
-
-    private void openSlot(int index) {
-        String slotName = slotNames[index];
-        String packageName = packageNames[index];
-
-        if (isAppInstalled(packageName)) {
-            Intent intent = getPackageManager().getLaunchIntentForPackage(packageName);
-
-            if (intent != null) {
-                startActivity(intent);
-            } else {
-                Toast.makeText(this, "Слот " + slotName + " не установлен", Toast.LENGTH_SHORT).show();
-            }
-        } else {
-            Toast.makeText(this, "Слот " + slotName + " не установлен", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void openAppSettings(int index) {
-        String slotName = slotNames[index];
-        String packageName = packageNames[index];
-
-        if (isAppInstalled(packageName)) {
-            Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-            intent.setData(Uri.parse("package:" + packageName));
+    private void openSlot(int slot) {
+        String packageName = packageName(slot);
+        Intent intent = getPackageManager().getLaunchIntentForPackage(packageName);
+        if (intent != null) {
             startActivity(intent);
         } else {
-            Toast.makeText(this, "Слот " + slotName + " не установлен", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Слот " + slotName(slot) + " не установлен", Toast.LENGTH_SHORT).show();
+            renderSlots();
         }
+    }
+
+    private void openAppSettings(int slot) {
+        Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+        intent.setData(Uri.parse("package:" + packageName(slot)));
+        startActivity(intent);
+    }
+
+    private void showInstallDialog(int slot) {
+        new AlertDialog.Builder(this)
+                .setTitle("Установка " + defaultSlotName(slot))
+                .setMessage("TGSpaces скачает APK этого клона и откроет системный установщик Android. Подтвердите установку. Если Android попросит разрешить установку из TGSpaces — разрешите её в настройках.")
+                .setPositiveButton("Скачать и установить", (dialog, which) -> downloadCloneApk(slot))
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void downloadCloneApk(int slot) {
+        File downloadsDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+        if (downloadsDir == null) {
+            Toast.makeText(this, "Недоступна папка загрузок приложения", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        String fileName = apkFileName(slot);
+        File target = new File(downloadsDir, fileName);
+        if (target.exists() && !target.delete()) {
+            Toast.makeText(this, "Не удалось заменить старый APK", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        DownloadManager.Request request = new DownloadManager.Request(Uri.parse(apkUrl(slot)));
+        request.setTitle(fileName);
+        request.setDescription("Скачивание " + defaultSlotName(slot));
+        request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+        request.setAllowedOverMetered(true);
+        request.setAllowedOverRoaming(true);
+        request.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, fileName);
+
+        DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+        long downloadId = manager.enqueue(request);
+        downloadSlots.put(downloadId, slot);
+        preferences.edit().putInt(downloadSlotKey(downloadId), slot).apply();
+        Toast.makeText(this, "Скачивание началось", Toast.LENGTH_SHORT).show();
+    }
+
+    private void handleDownloadedApk(long downloadId, int slot) {
+        DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+        DownloadManager.Query query = new DownloadManager.Query().setFilterById(downloadId);
+        try (Cursor cursor = manager.query(query)) {
+            if (cursor == null || !cursor.moveToFirst()) {
+                Toast.makeText(this, "Не удалось проверить загрузку APK", Toast.LENGTH_LONG).show();
+                return;
+            }
+            int status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
+            if (status != DownloadManager.STATUS_SUCCESSFUL) {
+                Toast.makeText(this, "APK не скачан. Проверьте релиз и подключение к интернету.", Toast.LENGTH_LONG).show();
+                return;
+            }
+        }
+
+        File apk = new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), apkFileName(slot));
+        preferences.edit().putString(KEY_PENDING_APK, apk.getAbsolutePath()).apply();
+        openInstallerOrUnknownSourcesSettings(apk);
+    }
+
+    private void tryOpenPendingInstaller() {
+        String pendingPath = preferences.getString(KEY_PENDING_APK, null);
+        if (pendingPath == null) {
+            return;
+        }
+
+        File apk = new File(pendingPath);
+        if (!apk.exists()) {
+            preferences.edit().remove(KEY_PENDING_APK).apply();
+            return;
+        }
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || getPackageManager().canRequestPackageInstalls()) {
+            preferences.edit().remove(KEY_PENDING_APK).apply();
+            openInstaller(apk);
+        }
+    }
+
+    private void openInstallerOrUnknownSourcesSettings(File apk) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !getPackageManager().canRequestPackageInstalls()) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Нужно разрешение Android")
+                    .setMessage("Разрешите TGSpaces устанавливать неизвестные приложения, затем вернитесь назад. После возврата TGSpaces откроет системный установщик APK.")
+                    .setPositiveButton("Открыть настройки", (dialog, which) -> {
+                        Intent intent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
+                        intent.setData(Uri.parse("package:" + getPackageName()));
+                        startActivity(intent);
+                    })
+                    .setNegativeButton("Отмена", null)
+                    .show();
+            return;
+        }
+
+        preferences.edit().remove(KEY_PENDING_APK).apply();
+        openInstaller(apk);
+    }
+
+    private void openInstaller(File apk) {
+        Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", apk);
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setDataAndType(uri, "application/vnd.android.package-archive");
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        startActivity(intent);
     }
 
     private boolean isAppInstalled(String packageName) {
@@ -246,5 +376,37 @@ public class MainActivity extends AppCompatActivity {
         } catch (PackageManager.NameNotFoundException e) {
             return false;
         }
+    }
+
+    private String slotName(int slot) {
+        return preferences.getString(slotNameKey(slot), defaultSlotName(slot));
+    }
+
+    private static String slotNameKey(int slot) {
+        return "slot_name_" + (slot - 1);
+    }
+
+    private static String defaultSlotName(int slot) {
+        return String.format(Locale.US, "TGClone %02d", slot);
+    }
+
+    private static String packageName(int slot) {
+        return String.format(Locale.US, "com.desperadoboi.tgclone%02d", slot);
+    }
+
+    private static String apkFileName(int slot) {
+        return String.format(Locale.US, "TGClone%02d-debug.apk", slot);
+    }
+
+    private static String apkUrl(int slot) {
+        return RELEASE_BASE_URL + apkFileName(slot);
+    }
+
+    private static String downloadSlotKey(long downloadId) {
+        return KEY_DOWNLOAD_SLOT_PREFIX + downloadId;
+    }
+
+    private int dp(int value) {
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 }
