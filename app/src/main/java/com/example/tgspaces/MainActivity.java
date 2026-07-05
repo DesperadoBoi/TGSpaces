@@ -51,7 +51,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String KEY_SLOT_ERROR_PREFIX = "slot_error_";
     private static final String KEY_SLOT_AUTO_OPENED_PREFIX = "slot_auto_opened_";
     private static final int MAX_CLONE_APKS = 10;
-    private static final String RELEASE_BASE_URL = "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.1-debug/";
+    private static final String RELEASE_BASE_URL = "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.2-release/";
     private static final long PROGRESS_REFRESH_MS = 1200L;
 
     private final Map<Long, Integer> downloadSlots = new HashMap<>();
@@ -755,7 +755,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private static String apkFileName(int slot) {
-        return String.format(Locale.US, "TGClone%02d-debug.apk", slot);
+        return String.format(Locale.US, "TGClone%02d-release.apk", slot);
     }
 
     private static String apkUrl(int slot) {
