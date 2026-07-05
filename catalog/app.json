@@ -1,0 +1,9 @@
+{
+  "appName": "TGSpaces",
+  "packageName": "com.example.tgspaces",
+  "releaseTag": "v0.2-release",
+  "apkFileName": "TGSpaces-release.apk",
+  "apkUrl": "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.2-release/TGSpaces-release.apk",
+  "versionName": "0.2.1",
+  "versionCode": 2
+}

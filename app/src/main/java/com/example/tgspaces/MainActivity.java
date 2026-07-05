@@ -62,15 +62,21 @@ public class MainActivity extends AppCompatActivity {
     private static final String KEY_SLOT_AUTO_OPENED_PREFIX = "slot_auto_opened_";
     private static final String KEY_SLOT_INSTALL_NOTICE_PREFIX = "slot_install_notice_";
     private static final String KEY_FIRST_LAUNCH_HELP_SHOWN = "first_launch_help_shown";
+    private static final String KEY_APP_UPDATE_DOWNLOAD_ID = "app_update_download_id";
+    private static final String KEY_APP_UPDATE_APK_PATH = "app_update_apk_path";
     private static final int MAX_CLONE_APKS = 10;
     private static final String CATALOG_URL = "https://raw.githubusercontent.com/DesperadoBoi/TGSpaces/main/catalog/clones.json";
+    private static final String APP_CATALOG_URL = "https://raw.githubusercontent.com/DesperadoBoi/TGSpaces/main/catalog/app.json";
     private static final String RELEASE_BASE_URL = "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.2-release/";
     private static final long PROGRESS_REFRESH_MS = 1200L;
 
     private final Map<Long, Integer> downloadSlots = new HashMap<>();
     private final Map<Integer, CloneInfo> cloneCatalog = new HashMap<>();
     private final Handler progressHandler = new Handler(Looper.getMainLooper());
+    private AppUpdateInfo appUpdateInfo;
     private SharedPreferences preferences;
+    private LinearLayout appUpdateBanner;
+    private TextView appUpdateText;
     private LinearLayout slotsContainer;
     private int visibleSlotCount = 1;
 
@@ -89,6 +95,11 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onReceive(Context context, Intent intent) {
             long downloadId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L);
+            if (downloadId > 0 && downloadId == preferences.getLong(KEY_APP_UPDATE_DOWNLOAD_ID, -1L)) {
+                handleDownloadedAppUpdate(downloadId, true);
+                return;
+            }
+
             Integer slot = downloadSlots.remove(downloadId);
             if (slot == null) {
                 int savedSlot = preferences.getInt(downloadSlotKey(downloadId), 0);
@@ -113,6 +124,8 @@ public class MainActivity extends AppCompatActivity {
         });
 
         preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        appUpdateBanner = findViewById(R.id.appUpdateBanner);
+        appUpdateText = findViewById(R.id.appUpdateText);
         slotsContainer = findViewById(R.id.slotsContainer);
 
         findViewById(R.id.buttonAddSlot).setOnClickListener(view -> addSlot());
@@ -121,13 +134,16 @@ public class MainActivity extends AppCompatActivity {
             renderSlots();
         });
         findViewById(R.id.buttonHelp).setOnClickListener(view -> showHelpDialog());
+        findViewById(R.id.buttonDownloadAppUpdate).setOnClickListener(view -> downloadAppUpdate());
 
         IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
         ContextCompat.registerReceiver(this, downloadReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
 
         checkDownloadsForTerminalStates(false);
+        checkAppUpdateDownload(false);
         renderSlots();
         loadCloneCatalog();
+        loadAppCatalog();
         showFirstLaunchDialogIfNeeded();
     }
 
@@ -135,6 +151,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         checkDownloadsForTerminalStates(false);
+        checkAppUpdateDownload(true);
         renderSlots();
     }
 
@@ -520,6 +537,146 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
+    private void loadAppCatalog() {
+        new Thread(() -> {
+            HttpURLConnection connection = null;
+            try {
+                URL url = new URL(APP_CATALOG_URL);
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setConnectTimeout(8000);
+                connection.setReadTimeout(8000);
+                connection.setRequestMethod("GET");
+
+                int responseCode = connection.getResponseCode();
+                if (responseCode < 200 || responseCode >= 300) {
+                    throw new IllegalStateException("HTTP " + responseCode);
+                }
+
+                StringBuilder body = new StringBuilder();
+                try (BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        body.append(line);
+                    }
+                }
+
+                AppUpdateInfo loadedAppUpdateInfo = parseAppUpdateInfo(body.toString());
+                runOnUiThread(() -> {
+                    appUpdateInfo = loadedAppUpdateInfo;
+                    renderAppUpdateBanner();
+                });
+            } catch (Exception e) {
+                Log.w(TAG, "TGSpaces app catalog load failed, app update check skipped", e);
+            } finally {
+                if (connection != null) {
+                    connection.disconnect();
+                }
+            }
+        }, "TGSpacesAppCatalogLoader").start();
+    }
+
+    private AppUpdateInfo parseAppUpdateInfo(String json) throws Exception {
+        JSONObject root = new JSONObject(json);
+        String packageName = requiredString(root, "packageName");
+        if (!getPackageName().equals(packageName)) {
+            throw new IllegalArgumentException("Unexpected TGSpaces packageName: " + packageName);
+        }
+
+        return new AppUpdateInfo(
+                requiredString(root, "appName"),
+                packageName,
+                requiredString(root, "releaseTag"),
+                requiredString(root, "apkFileName"),
+                requiredString(root, "apkUrl"),
+                requiredString(root, "versionName"),
+                root.getLong("versionCode")
+        );
+    }
+
+    private void renderAppUpdateBanner() {
+        if (appUpdateBanner == null) {
+            return;
+        }
+
+        InstalledCloneInfo installedAppInfo = getInstalledAppInfo();
+        if (installedAppInfo == null || appUpdateInfo == null) {
+            appUpdateBanner.setVisibility(View.GONE);
+            return;
+        }
+
+        Log.d(TAG, "Installed TGSpaces version: versionCode=" + installedAppInfo.versionCode
+                + ", versionName=" + installedAppInfo.versionName);
+        Log.d(TAG, "Remote TGSpaces version: versionCode=" + appUpdateInfo.versionCode
+                + ", versionName=" + appUpdateInfo.versionName);
+
+        if (appUpdateInfo.versionCode > installedAppInfo.versionCode) {
+            Log.d(TAG, "TGSpaces update available: installedVersionCode=" + installedAppInfo.versionCode
+                    + ", remoteVersionCode=" + appUpdateInfo.versionCode);
+            appUpdateText.setText("Текущая версия: " + versionText(installedAppInfo.versionName)
+                    + "\nНовая версия: " + versionText(appUpdateInfo.versionName));
+            appUpdateBanner.setVisibility(View.VISIBLE);
+        } else {
+            Log.d(TAG, "No TGSpaces update available");
+            appUpdateBanner.setVisibility(View.GONE);
+        }
+    }
+
+    private void downloadAppUpdate() {
+        if (appUpdateInfo == null) {
+            return;
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !getPackageManager().canRequestPackageInstalls()) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Нужно разрешение Android")
+                    .setMessage("Чтобы установить обновление TGSpaces, разрешите установку APK из этого источника.")
+                    .setPositiveButton("Открыть настройки", (dialog, which) -> {
+                        Intent intent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
+                        intent.setData(Uri.parse("package:" + getPackageName()));
+                        startActivity(intent);
+                    })
+                    .setNegativeButton("Отмена", null)
+                    .show();
+            return;
+        }
+
+        long activeDownload = preferences.getLong(KEY_APP_UPDATE_DOWNLOAD_ID, -1L);
+        if (activeDownload > 0 && isDownloadActive(activeDownload)) {
+            Toast.makeText(this, "Обновление TGSpaces уже скачивается", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        File downloadsDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+        if (downloadsDir == null) {
+            Toast.makeText(this, "Недоступна папка загрузок приложения", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        File target = new File(downloadsDir, appUpdateInfo.apkFileName);
+        if (target.exists() && !target.delete()) {
+            Toast.makeText(this, "Не удалось заменить старый APK обновления", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Log.d(TAG, "Downloading TGSpaces update APK: url=" + appUpdateInfo.apkUrl);
+        DownloadManager.Request request = new DownloadManager.Request(Uri.parse(appUpdateInfo.apkUrl));
+        request.setTitle(appUpdateInfo.apkFileName);
+        request.setDescription("Скачивание обновления TGSpaces");
+        request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+        request.setAllowedOverMetered(true);
+        request.setAllowedOverRoaming(true);
+        request.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, appUpdateInfo.apkFileName);
+
+        DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+        long downloadId = manager.enqueue(request);
+        preferences.edit()
+                .putLong(KEY_APP_UPDATE_DOWNLOAD_ID, downloadId)
+                .remove(KEY_APP_UPDATE_APK_PATH)
+                .apply();
+        Toast.makeText(this, "Скачивание обновления началось", Toast.LENGTH_SHORT).show();
+    }
+
     private void downloadCloneApk(int slot) {
         File downloadsDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
         if (downloadsDir == null) {
@@ -607,6 +764,111 @@ public class MainActivity extends AppCompatActivity {
                 logDownloadProblem(slot, downloadId, info.localUri, info.status, info.reason);
                 clearSlotDownload(slot);
             }
+        }
+    }
+
+    private void checkAppUpdateDownload(boolean autoOpen) {
+        long downloadId = preferences.getLong(KEY_APP_UPDATE_DOWNLOAD_ID, -1L);
+        if (downloadId <= 0) {
+            return;
+        }
+
+        DownloadInfo info = queryDownload(downloadId);
+        if (info == null) {
+            return;
+        }
+
+        if (info.status == DownloadManager.STATUS_SUCCESSFUL) {
+            handleDownloadedAppUpdate(downloadId, autoOpen);
+        } else if (info.status == DownloadManager.STATUS_FAILED) {
+            Log.w(TAG, "TGSpaces update download failed: downloadId=" + downloadId
+                    + ", reason=" + info.reason
+                    + " (" + downloadReasonToMessage(info.reason) + ")");
+            preferences.edit()
+                    .remove(KEY_APP_UPDATE_DOWNLOAD_ID)
+                    .remove(KEY_APP_UPDATE_APK_PATH)
+                    .apply();
+        }
+    }
+
+    private void handleDownloadedAppUpdate(long downloadId, boolean autoOpen) {
+        DownloadInfo info = queryDownload(downloadId);
+        if (info == null) {
+            Log.w(TAG, "Could not query TGSpaces update download: downloadId=" + downloadId);
+            return;
+        }
+
+        if (info.status != DownloadManager.STATUS_SUCCESSFUL) {
+            Log.w(TAG, "TGSpaces update download is not successful: downloadId=" + downloadId
+                    + ", status=" + info.status
+                    + ", reason=" + info.reason);
+            preferences.edit()
+                    .remove(KEY_APP_UPDATE_DOWNLOAD_ID)
+                    .remove(KEY_APP_UPDATE_APK_PATH)
+                    .apply();
+            return;
+        }
+
+        File apkFile = resolveDownloadedAppUpdateFile(info);
+        if (apkFile == null || !apkFile.exists()) {
+            Log.w(TAG, "TGSpaces update APK was downloaded but file was not found");
+            preferences.edit()
+                    .remove(KEY_APP_UPDATE_DOWNLOAD_ID)
+                    .remove(KEY_APP_UPDATE_APK_PATH)
+                    .apply();
+            return;
+        }
+
+        preferences.edit()
+                .putString(KEY_APP_UPDATE_APK_PATH, apkFile.getAbsolutePath())
+                .remove(KEY_APP_UPDATE_DOWNLOAD_ID)
+                .apply();
+
+        if (autoOpen) {
+            openAppUpdateInstaller(apkFile);
+        }
+    }
+
+    private File resolveDownloadedAppUpdateFile(DownloadInfo info) {
+        if (info != null && info.localUri != null) {
+            Uri localUri = Uri.parse(info.localUri);
+            if ("file".equals(localUri.getScheme()) && localUri.getPath() != null) {
+                return new File(localUri.getPath());
+            }
+        }
+
+        String savedPath = preferences.getString(KEY_APP_UPDATE_APK_PATH, null);
+        if (savedPath != null) {
+            File savedFile = new File(savedPath);
+            if (savedFile.exists()) {
+                return savedFile;
+            }
+        }
+
+        if (appUpdateInfo != null) {
+            File downloadsDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+            if (downloadsDir != null) {
+                return new File(downloadsDir, appUpdateInfo.apkFileName);
+            }
+        }
+
+        return null;
+    }
+
+    private void openAppUpdateInstaller(File apkFile) {
+        try {
+            Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", apkFile);
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(uri, "application/vnd.android.package-archive");
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(intent);
+        } catch (Exception e) {
+            Log.e(TAG, "Could not open TGSpaces update installer, path=" + apkFile.getAbsolutePath(), e);
+            new AlertDialog.Builder(this)
+                    .setTitle("Не удалось открыть установщик")
+                    .setMessage("Обновление TGSpaces скачано, но приложение не смогло открыть системный установщик. Откройте APK вручную из файлов приложения.")
+                    .setPositiveButton("OK", null)
+                    .show();
         }
     }
 
@@ -961,6 +1223,19 @@ public class MainActivity extends AppCompatActivity {
             return null;
         }
 
+        return installedInfoFromPackageInfo(packageName, packageInfo);
+    }
+
+    private InstalledCloneInfo getInstalledAppInfo() {
+        PackageInfo packageInfo = getInstalledPackageInfo(getPackageName());
+        if (packageInfo == null) {
+            return null;
+        }
+
+        return installedInfoFromPackageInfo(getPackageName(), packageInfo);
+    }
+
+    private InstalledCloneInfo installedInfoFromPackageInfo(String packageName, PackageInfo packageInfo) {
         long versionCode;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             versionCode = packageInfo.getLongVersionCode();
@@ -969,6 +1244,10 @@ public class MainActivity extends AppCompatActivity {
         }
         String versionName = packageInfo.versionName != null ? packageInfo.versionName : "";
         return new InstalledCloneInfo(packageName, versionCode, versionName);
+    }
+
+    private static String versionText(String versionName) {
+        return versionName == null || versionName.isEmpty() ? "неизвестно" : versionName;
     }
 
     private PackageInfo getInstalledPackageInfo(String packageName) {
@@ -1137,6 +1416,26 @@ public class MainActivity extends AppCompatActivity {
             this.packageName = packageName;
             this.versionCode = versionCode;
             this.versionName = versionName;
+        }
+    }
+
+    private static class AppUpdateInfo {
+        final String appName;
+        final String packageName;
+        final String releaseTag;
+        final String apkFileName;
+        final String apkUrl;
+        final String versionName;
+        final long versionCode;
+
+        AppUpdateInfo(String appName, String packageName, String releaseTag, String apkFileName, String apkUrl, String versionName, long versionCode) {
+            this.appName = appName;
+            this.packageName = packageName;
+            this.releaseTag = releaseTag;
+            this.apkFileName = apkFileName;
+            this.apkUrl = apkUrl;
+            this.versionName = versionName;
+            this.versionCode = versionCode;
         }
     }
 
