@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.graphics.Color;
@@ -207,6 +208,12 @@ public class MainActivity extends AppCompatActivity {
         }
 
         switch (state.type) {
+            case UPDATE_AVAILABLE:
+                card.addView(createButton("Обновить", true, true, view -> downloadCloneApk(slot)));
+                card.addView(createButton("Открыть", false, true, view -> openSlot(slot)));
+                card.addView(createButton("Настройки", false, true, view -> openAppSettings(slot)));
+                card.addView(createButton("Переименовать", false, true, view -> showRenameDialog(slot)));
+                break;
             case INSTALLED:
                 card.addView(createButton("Открыть", true, true, view -> openSlot(slot)));
                 card.addView(createButton("Настройки", false, true, view -> openAppSettings(slot)));
@@ -254,7 +261,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private SlotState getSlotState(int slot) {
-        if (isAppInstalled(packageName(slot))) {
+        InstalledCloneInfo installedCloneInfo = getInstalledCloneInfo(slot);
+        if (installedCloneInfo != null) {
             clearSlotDownload(slot);
             if (preferences.getInt(KEY_PENDING_SLOT, 0) == slot) {
                 showInstalledCloneNoticeOnce(slot);
@@ -265,7 +273,7 @@ public class MainActivity extends AppCompatActivity {
                         .remove(slotAutoOpenedKey(slot))
                         .apply();
             }
-            return SlotState.installed();
+            return installedSlotState(slot, installedCloneInfo);
         }
 
         if (hasPendingApk(slot)) {
@@ -783,7 +791,8 @@ public class MainActivity extends AppCompatActivity {
                     requiredString(item, "packageName"),
                     requiredString(item, "apkFileName"),
                     requiredString(item, "apkUrl"),
-                    item.optString("versionName", "")
+                    item.optString("versionName", ""),
+                    item.has("versionCode") && !item.isNull("versionCode") ? item.getLong("versionCode") : null
             );
             parsedCatalog.put(slot, cloneInfo);
         }
@@ -836,11 +845,58 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private boolean isAppInstalled(String packageName) {
+        return getInstalledPackageInfo(packageName) != null;
+    }
+
+    private SlotState installedSlotState(int slot, InstalledCloneInfo installedCloneInfo) {
+        CloneInfo cloneInfo = cloneCatalog.get(slot);
+        Log.d(TAG, "Installed clone version: slot=" + slot
+                + ", packageName=" + installedCloneInfo.packageName
+                + ", versionCode=" + installedCloneInfo.versionCode
+                + ", versionName=" + installedCloneInfo.versionName);
+
+        if (cloneInfo == null || cloneInfo.versionCode == null) {
+            Log.w(TAG, "Remote clone versionCode unavailable, update check skipped: slot=" + slot);
+            return SlotState.installed(installedCloneInfo.versionName);
+        }
+
+        Log.d(TAG, "Remote clone version: slot=" + slot
+                + ", packageName=" + cloneInfo.packageName
+                + ", versionCode=" + cloneInfo.versionCode
+                + ", versionName=" + cloneInfo.versionName);
+
+        if (cloneInfo.versionCode > installedCloneInfo.versionCode) {
+            Log.d(TAG, "Clone update available: slot=" + slot
+                    + ", installedVersionCode=" + installedCloneInfo.versionCode
+                    + ", remoteVersionCode=" + cloneInfo.versionCode);
+            return SlotState.updateAvailable(installedCloneInfo.versionName, cloneInfo.versionName);
+        }
+
+        return SlotState.installed(installedCloneInfo.versionName);
+    }
+
+    private InstalledCloneInfo getInstalledCloneInfo(int slot) {
+        String packageName = packageName(slot);
+        PackageInfo packageInfo = getInstalledPackageInfo(packageName);
+        if (packageInfo == null) {
+            return null;
+        }
+
+        long versionCode;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            versionCode = packageInfo.getLongVersionCode();
+        } else {
+            versionCode = packageInfo.versionCode;
+        }
+        String versionName = packageInfo.versionName != null ? packageInfo.versionName : "";
+        return new InstalledCloneInfo(packageName, versionCode, versionName);
+    }
+
+    private PackageInfo getInstalledPackageInfo(String packageName) {
         try {
-            getPackageManager().getPackageInfo(packageName, 0);
-            return true;
+            return getPackageManager().getPackageInfo(packageName, 0);
         } catch (PackageManager.NameNotFoundException e) {
-            return false;
+            return null;
         }
     }
 
@@ -914,6 +970,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private enum SlotStateType {
+        UPDATE_AVAILABLE,
         INSTALLED,
         NOT_INSTALLED,
         DOWNLOADING,
@@ -934,8 +991,24 @@ public class MainActivity extends AppCompatActivity {
             this.statusColor = statusColor;
         }
 
-        static SlotState installed() {
-            return new SlotState(SlotStateType.INSTALLED, "Установлено", null, Color.parseColor("#86EFAC"));
+        static SlotState installed(String versionName) {
+            String hintText = versionName == null || versionName.isEmpty() ? null : "Версия: " + versionName;
+            return new SlotState(SlotStateType.INSTALLED, "Установлено", hintText, Color.parseColor("#86EFAC"));
+        }
+
+        static SlotState updateAvailable(String installedVersionName, String remoteVersionName) {
+            String installed = installedVersionName == null || installedVersionName.isEmpty()
+                    ? "неизвестно"
+                    : installedVersionName;
+            String remote = remoteVersionName == null || remoteVersionName.isEmpty()
+                    ? "неизвестно"
+                    : remoteVersionName;
+            return new SlotState(
+                    SlotStateType.UPDATE_AVAILABLE,
+                    "Доступно обновление",
+                    "Установлена: " + installed + "\nНовая: " + remote,
+                    Color.parseColor("#FBBF24")
+            );
         }
 
         static SlotState notInstalled() {
@@ -976,6 +1049,18 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private static class InstalledCloneInfo {
+        final String packageName;
+        final long versionCode;
+        final String versionName;
+
+        InstalledCloneInfo(String packageName, long versionCode, String versionName) {
+            this.packageName = packageName;
+            this.versionCode = versionCode;
+            this.versionName = versionName;
+        }
+    }
+
     private static class CloneInfo {
         final int slot;
         final String name;
@@ -983,14 +1068,16 @@ public class MainActivity extends AppCompatActivity {
         final String apkFileName;
         final String apkUrl;
         final String versionName;
+        final Long versionCode;
 
-        CloneInfo(int slot, String name, String packageName, String apkFileName, String apkUrl, String versionName) {
+        CloneInfo(int slot, String name, String packageName, String apkFileName, String apkUrl, String versionName, Long versionCode) {
             this.slot = slot;
             this.name = name;
             this.packageName = packageName;
             this.apkFileName = apkFileName;
             this.apkUrl = apkUrl;
             this.versionName = versionName;
+            this.versionCode = versionCode;
         }
     }
 }
