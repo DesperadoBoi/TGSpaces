@@ -61,6 +61,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String KEY_SLOT_ERROR_PREFIX = "slot_error_";
     private static final String KEY_SLOT_AUTO_OPENED_PREFIX = "slot_auto_opened_";
     private static final String KEY_SLOT_INSTALL_NOTICE_PREFIX = "slot_install_notice_";
+    private static final String KEY_FIRST_LAUNCH_HELP_SHOWN = "first_launch_help_shown";
     private static final int MAX_CLONE_APKS = 10;
     private static final String CATALOG_URL = "https://raw.githubusercontent.com/DesperadoBoi/TGSpaces/main/catalog/clones.json";
     private static final String RELEASE_BASE_URL = "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.2-release/";
@@ -119,6 +120,7 @@ public class MainActivity extends AppCompatActivity {
             checkDownloadsForTerminalStates(false);
             renderSlots();
         });
+        findViewById(R.id.buttonHelp).setOnClickListener(view -> showHelpDialog());
 
         IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
         ContextCompat.registerReceiver(this, downloadReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
@@ -126,6 +128,7 @@ public class MainActivity extends AppCompatActivity {
         checkDownloadsForTerminalStates(false);
         renderSlots();
         loadCloneCatalog();
+        showFirstLaunchDialogIfNeeded();
     }
 
     @Override
@@ -299,6 +302,41 @@ public class MainActivity extends AppCompatActivity {
             button.setOnClickListener(listener);
         }
         return button;
+    }
+
+    private void showFirstLaunchDialogIfNeeded() {
+        if (preferences.getBoolean(KEY_FIRST_LAUNCH_HELP_SHOWN, false)) {
+            return;
+        }
+
+        preferences.edit().putBoolean(KEY_FIRST_LAUNCH_HELP_SHOWN, true).apply();
+        new AlertDialog.Builder(this)
+                .setTitle("TGSpaces")
+                .setMessage("TGSpaces помогает устанавливать отдельные копии Telegram. Каждый слот — отдельное приложение и отдельный вход в аккаунт.")
+                .setPositiveButton("Понятно", null)
+                .setNegativeButton("Помощь", (dialog, which) -> showHelpDialog())
+                .show();
+    }
+
+    private void showHelpDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle("Помощь / О приложении")
+                .setMessage(
+                        "TGSpaces — менеджер отдельных Telegram-клонов.\n\n"
+                                + "Что такое слот:\n"
+                                + "Слот — это отдельная копия Telegram с отдельным входом в аккаунт.\n\n"
+                                + "Как установить клон:\n"
+                                + "1. Нажмите \"Добавить слот\".\n"
+                                + "2. Нажмите \"Установить клон\".\n"
+                                + "3. Дождитесь загрузки APK.\n"
+                                + "4. Подтвердите установку в системном установщике Android.\n\n"
+                                + "Важно:\n"
+                                + "- Для установки может потребоваться разрешение \"Установка неизвестных приложений\".\n"
+                                + "- Если иконка в настройках Android отображается неправильно, откройте клон один раз или перезагрузите телефон.\n"
+                                + "- TGSpaces не является официальным приложением Telegram."
+                )
+                .setPositiveButton("ОК", null)
+                .show();
     }
 
     private SlotState getSlotState(int slot) {

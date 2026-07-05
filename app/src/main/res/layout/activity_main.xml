@@ -26,11 +26,24 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="@dimen/section_gap"
+            android:layout_marginBottom="8dp"
             android:lineSpacingExtra="2dp"
             android:text="Слот — это отдельная копия Telegram с отдельным входом в аккаунт."
             android:textColor="@color/text_secondary"
             android:textSize="15sp" />
+
+        <Button
+            android:id="@+id/buttonHelp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="@dimen/section_gap"
+            android:background="@drawable/button_secondary_background"
+            android:minHeight="40dp"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:text="Помощь"
+            android:textAllCaps="false"
+            android:textColor="@color/text_primary" />
 
         <LinearLayout
             android:layout_width="match_parent"
