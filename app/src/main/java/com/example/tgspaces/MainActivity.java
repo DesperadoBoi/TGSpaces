@@ -29,6 +29,7 @@ import android.widget.Toast;
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -120,11 +121,7 @@ public class MainActivity extends AppCompatActivity {
         });
 
         IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(downloadReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
-        } else {
-            registerReceiver(downloadReceiver, filter);
-        }
+        ContextCompat.registerReceiver(this, downloadReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
 
         checkDownloadsForTerminalStates(false);
         renderSlots();
@@ -162,8 +159,7 @@ public class MainActivity extends AppCompatActivity {
     private View createSlotCard(int slot) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(12), dp(12), dp(12), dp(12));
-        card.setBackgroundResource(R.drawable.slot_card_background);
+        card.setPadding(dp(14), dp(14), dp(14), dp(14));
 
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -173,11 +169,16 @@ public class MainActivity extends AppCompatActivity {
         card.setLayoutParams(cardParams);
 
         SlotState state = getSlotState(slot);
+        card.setBackgroundResource(
+                state.type == SlotStateType.UPDATE_AVAILABLE
+                        ? R.drawable.slot_card_update_background
+                        : R.drawable.slot_card_background
+        );
 
         TextView title = new TextView(this);
         title.setText(slotName(slot));
-        title.setTextColor(Color.parseColor("#F9FAFB"));
-        title.setTextSize(21);
+        title.setTextColor(Color.parseColor("#F8FAFC"));
+        title.setTextSize(23);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         card.addView(title);
 
@@ -203,20 +204,24 @@ public class MainActivity extends AppCompatActivity {
             hint.setLayoutParams(hintParams);
             hint.setText(state.hintText);
             hint.setTextColor(Color.parseColor("#CBD5E1"));
-            hint.setTextSize(14);
+            hint.setTextSize(15);
+            hint.setLineSpacing(dp(2), 1.0f);
             card.addView(hint);
         }
 
         switch (state.type) {
             case UPDATE_AVAILABLE:
-                card.addView(createButton("Обновить", true, true, view -> downloadCloneApk(slot)));
-                card.addView(createButton("Открыть", false, true, view -> openSlot(slot)));
-                card.addView(createButton("Настройки", false, true, view -> openAppSettings(slot)));
-                card.addView(createButton("Переименовать", false, true, view -> showRenameDialog(slot)));
+                addButtonRow(card,
+                        createButton("Обновить", true, true, view -> downloadCloneApk(slot)),
+                        createButton("Открыть", false, true, view -> openSlot(slot)));
+                addButtonRow(card,
+                        createButton("Настройки", false, true, view -> openAppSettings(slot)),
+                        createButton("Переименовать", false, true, view -> showRenameDialog(slot)));
                 break;
             case INSTALLED:
-                card.addView(createButton("Открыть", true, true, view -> openSlot(slot)));
-                card.addView(createButton("Настройки", false, true, view -> openAppSettings(slot)));
+                addButtonRow(card,
+                        createButton("Открыть", true, true, view -> openSlot(slot)),
+                        createButton("Настройки", false, true, view -> openAppSettings(slot)));
                 card.addView(createButton("Переименовать", false, true, view -> showRenameDialog(slot)));
                 break;
             case DOWNLOADING:
@@ -225,12 +230,14 @@ public class MainActivity extends AppCompatActivity {
                 break;
             case WAITING_INSTALL:
                 card.addView(createButton("Открыть установщик", true, true, view -> openInstallerForDownloadedApk(slot, getKnownDownloadId(slot))));
-                card.addView(createButton("Повторить загрузку", false, true, view -> showInstallDialog(slot)));
-                card.addView(createButton("Переименовать", false, true, view -> showRenameDialog(slot)));
+                addButtonRow(card,
+                        createButton("Повторить загрузку", false, true, view -> showInstallDialog(slot)),
+                        createButton("Переименовать", false, true, view -> showRenameDialog(slot)));
                 break;
             case DOWNLOAD_ERROR:
-                card.addView(createButton("Повторить", true, true, view -> showInstallDialog(slot)));
-                card.addView(createButton("Переименовать", false, true, view -> showRenameDialog(slot)));
+                addButtonRow(card,
+                        createButton("Повторить", true, true, view -> showInstallDialog(slot)),
+                        createButton("Переименовать", false, true, view -> showRenameDialog(slot)));
                 break;
             case NOT_INSTALLED:
             default:
@@ -240,6 +247,37 @@ public class MainActivity extends AppCompatActivity {
         }
 
         return card;
+    }
+
+    private void addButtonRow(LinearLayout card, Button first, Button second) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        rowParams.topMargin = dp(8);
+        row.setLayoutParams(rowParams);
+
+        LinearLayout.LayoutParams firstParams = new LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1
+        );
+        firstParams.setMargins(0, 0, dp(4), 0);
+        first.setLayoutParams(firstParams);
+
+        LinearLayout.LayoutParams secondParams = new LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1
+        );
+        secondParams.setMargins(dp(4), 0, 0, 0);
+        second.setLayoutParams(secondParams);
+
+        row.addView(first);
+        row.addView(second);
+        card.addView(row);
     }
 
     private Button createButton(String text, boolean primary, boolean enabled, View.OnClickListener listener) {
@@ -254,6 +292,9 @@ public class MainActivity extends AppCompatActivity {
         button.setAllCaps(false);
         button.setEnabled(enabled);
         button.setTypeface(Typeface.DEFAULT, primary ? Typeface.BOLD : Typeface.NORMAL);
+        button.setMinHeight(dp(44));
+        button.setTextColor(Color.parseColor("#F8FAFC"));
+        button.setBackgroundResource(primary ? R.drawable.button_primary_background : R.drawable.button_secondary_background);
         if (listener != null) {
             button.setOnClickListener(listener);
         }
