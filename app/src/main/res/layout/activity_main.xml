@@ -4,52 +4,63 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#111827"
+    android:background="@color/screen_bg"
+    android:fillViewport="true"
     tools:context=".MainActivity">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="@dimen/screen_padding">
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
+            android:layout_marginBottom="6dp"
             android:text="TGSpaces"
-            android:textColor="#F9FAFB"
-            android:textSize="26sp"
+            android:textColor="@color/text_primary"
+            android:textSize="30sp"
             android:textStyle="bold" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="14dp"
-            android:text="Добавляйте слоты и устанавливайте только нужные Telegram-клоны."
-            android:textColor="#CBD5E1"
-            android:textSize="14sp" />
+            android:layout_marginBottom="@dimen/section_gap"
+            android:lineSpacingExtra="2dp"
+            android:text="Слот — это отдельная копия Telegram с отдельным входом в аккаунт."
+            android:textColor="@color/text_secondary"
+            android:textSize="15sp" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
+            android:layout_marginBottom="@dimen/section_gap"
             android:orientation="horizontal">
 
             <Button
                 android:id="@+id/buttonAddSlot"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
+                android:layout_marginEnd="@dimen/button_gap"
                 android:layout_weight="1"
-                android:text="Добавить слот" />
+                android:background="@drawable/button_primary_background"
+                android:minHeight="48dp"
+                android:text="Добавить слот"
+                android:textAllCaps="false"
+                android:textColor="@color/text_primary"
+                android:textStyle="bold" />
 
             <Button
                 android:id="@+id/buttonRefresh"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Обновить" />
+                android:background="@drawable/button_secondary_background"
+                android:minHeight="48dp"
+                android:text="Обновить"
+                android:textAllCaps="false"
+                android:textColor="@color/text_primary" />
         </LinearLayout>
 
         <LinearLayout
@@ -57,5 +68,14 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:paddingBottom="8dp"
+            android:text="TGSpaces не является официальным приложением Telegram."
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
     </LinearLayout>
 </ScrollView>
