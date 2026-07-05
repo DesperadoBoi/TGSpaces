@@ -33,7 +33,15 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -51,10 +59,12 @@ public class MainActivity extends AppCompatActivity {
     private static final String KEY_SLOT_ERROR_PREFIX = "slot_error_";
     private static final String KEY_SLOT_AUTO_OPENED_PREFIX = "slot_auto_opened_";
     private static final int MAX_CLONE_APKS = 10;
+    private static final String CATALOG_URL = "https://raw.githubusercontent.com/DesperadoBoi/TGSpaces/main/catalog/clones.json";
     private static final String RELEASE_BASE_URL = "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.2-release/";
     private static final long PROGRESS_REFRESH_MS = 1200L;
 
     private final Map<Long, Integer> downloadSlots = new HashMap<>();
+    private final Map<Integer, CloneInfo> cloneCatalog = new HashMap<>();
     private final Handler progressHandler = new Handler(Looper.getMainLooper());
     private SharedPreferences preferences;
     private LinearLayout slotsContainer;
@@ -116,6 +126,7 @@ public class MainActivity extends AppCompatActivity {
 
         checkDownloadsForTerminalStates(false);
         renderSlots();
+        loadCloneCatalog();
     }
 
     @Override
@@ -307,7 +318,7 @@ public class MainActivity extends AppCompatActivity {
         if (emptySlot > 0) {
             new AlertDialog.Builder(this)
                     .setTitle("Пустой слот уже есть")
-                    .setMessage("У вас уже есть пустой слот: " + defaultSlotName(emptySlot) + ". Сначала установите клон в него.")
+                    .setMessage("У вас уже есть пустой слот: " + cloneName(emptySlot) + ". Сначала установите клон в него.")
                     .setPositiveButton("OK", null)
                     .show();
             return;
@@ -413,7 +424,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         new AlertDialog.Builder(this)
-                .setTitle("Установка " + defaultSlotName(slot))
+                .setTitle("Установка " + cloneName(slot))
                 .setMessage("TGSpaces скачает APK этого клона и откроет системный установщик Android. Подтвердите установку. Если Android попросит разрешить установку из TGSpaces - разрешите её в настройках.")
                 .setPositiveButton("Скачать и установить", (dialog, which) -> downloadCloneApk(slot))
                 .setNegativeButton("Отмена", null)
@@ -434,9 +445,11 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        DownloadManager.Request request = new DownloadManager.Request(Uri.parse(apkUrl(slot)));
+        String url = apkUrl(slot);
+        Log.d(TAG, "Downloading clone APK: slot=" + slot + ", url=" + url);
+        DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
         request.setTitle(fileName);
-        request.setDescription("Скачивание " + defaultSlotName(slot));
+        request.setDescription("Скачивание " + cloneName(slot));
         request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
         request.setAllowedOverMetered(true);
         request.setAllowedOverRoaming(true);
@@ -692,6 +705,84 @@ public class MainActivity extends AppCompatActivity {
                 + " (" + downloadReasonToMessage(reason) + ")");
     }
 
+    private void loadCloneCatalog() {
+        new Thread(() -> {
+            HttpURLConnection connection = null;
+            try {
+                URL url = new URL(CATALOG_URL);
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setConnectTimeout(8000);
+                connection.setReadTimeout(8000);
+                connection.setRequestMethod("GET");
+
+                int responseCode = connection.getResponseCode();
+                if (responseCode < 200 || responseCode >= 300) {
+                    throw new IllegalStateException("HTTP " + responseCode);
+                }
+
+                StringBuilder body = new StringBuilder();
+                try (BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        body.append(line);
+                    }
+                }
+
+                Map<Integer, CloneInfo> loadedCatalog = parseCloneCatalog(body.toString());
+                runOnUiThread(() -> {
+                    cloneCatalog.clear();
+                    cloneCatalog.putAll(loadedCatalog);
+                    Log.d(TAG, "Clone catalog loaded: " + cloneCatalog.size() + " clones");
+                    renderSlots();
+                });
+            } catch (Exception e) {
+                Log.w(TAG, "Clone catalog load failed, using fallback clone URLs", e);
+            } finally {
+                if (connection != null) {
+                    connection.disconnect();
+                }
+            }
+        }, "TGSpacesCatalogLoader").start();
+    }
+
+    private Map<Integer, CloneInfo> parseCloneCatalog(String json) throws Exception {
+        JSONObject root = new JSONObject(json);
+        JSONArray clones = root.getJSONArray("clones");
+        Map<Integer, CloneInfo> parsedCatalog = new HashMap<>();
+
+        for (int i = 0; i < clones.length(); i++) {
+            JSONObject item = clones.getJSONObject(i);
+            int slot = item.getInt("slot");
+            if (slot < 1 || slot > MAX_CLONE_APKS) {
+                continue;
+            }
+
+            CloneInfo cloneInfo = new CloneInfo(
+                    slot,
+                    requiredString(item, "name"),
+                    requiredString(item, "packageName"),
+                    requiredString(item, "apkFileName"),
+                    requiredString(item, "apkUrl"),
+                    item.optString("versionName", "")
+            );
+            parsedCatalog.put(slot, cloneInfo);
+        }
+
+        if (parsedCatalog.isEmpty()) {
+            throw new IllegalArgumentException("Catalog has no usable clones");
+        }
+        return parsedCatalog;
+    }
+
+    private static String requiredString(JSONObject object, String name) throws Exception {
+        String value = object.getString(name).trim();
+        if (value.isEmpty()) {
+            throw new IllegalArgumentException("Missing " + name);
+        }
+        return value;
+    }
+
     private String downloadReasonToMessage(int reason) {
         switch (reason) {
             case DownloadManager.ERROR_CANNOT_RESUME:
@@ -735,7 +826,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private String slotName(int slot) {
-        return preferences.getString(slotNameKey(slot), defaultSlotName(slot));
+        return preferences.getString(slotNameKey(slot), cloneName(slot));
     }
 
     private File expectedApkFile(int slot) {
@@ -750,15 +841,32 @@ public class MainActivity extends AppCompatActivity {
         return String.format(Locale.US, "TGClone %02d", slot);
     }
 
-    private static String packageName(int slot) {
+    private String cloneName(int slot) {
+        CloneInfo cloneInfo = cloneCatalog.get(slot);
+        return cloneInfo != null ? cloneInfo.name : defaultSlotName(slot);
+    }
+
+    private String packageName(int slot) {
+        CloneInfo cloneInfo = cloneCatalog.get(slot);
+        if (cloneInfo != null) {
+            return cloneInfo.packageName;
+        }
         return String.format(Locale.US, "com.desperadoboi.tgclone%02d", slot);
     }
 
-    private static String apkFileName(int slot) {
+    private String apkFileName(int slot) {
+        CloneInfo cloneInfo = cloneCatalog.get(slot);
+        if (cloneInfo != null) {
+            return cloneInfo.apkFileName;
+        }
         return String.format(Locale.US, "TGClone%02d-release.apk", slot);
     }
 
-    private static String apkUrl(int slot) {
+    private String apkUrl(int slot) {
+        CloneInfo cloneInfo = cloneCatalog.get(slot);
+        if (cloneInfo != null) {
+            return cloneInfo.apkUrl;
+        }
         return RELEASE_BASE_URL + apkFileName(slot);
     }
 
@@ -842,6 +950,24 @@ public class MainActivity extends AppCompatActivity {
             this.downloadedBytes = downloadedBytes;
             this.totalBytes = totalBytes;
             this.localUri = localUri;
+        }
+    }
+
+    private static class CloneInfo {
+        final int slot;
+        final String name;
+        final String packageName;
+        final String apkFileName;
+        final String apkUrl;
+        final String versionName;
+
+        CloneInfo(int slot, String name, String packageName, String apkFileName, String apkUrl, String versionName) {
+            this.slot = slot;
+            this.name = name;
+            this.packageName = packageName;
+            this.apkFileName = apkFileName;
+            this.apkUrl = apkUrl;
+            this.versionName = versionName;
         }
     }
 }
