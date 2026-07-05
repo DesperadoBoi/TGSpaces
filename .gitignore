@@ -15,3 +15,7 @@
 local.properties
 
 dist/
+
+signing.properties
+
+*.jks
