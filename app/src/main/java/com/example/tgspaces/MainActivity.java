@@ -58,6 +58,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String KEY_SLOT_DOWNLOAD_PREFIX = "slot_download_";
     private static final String KEY_SLOT_ERROR_PREFIX = "slot_error_";
     private static final String KEY_SLOT_AUTO_OPENED_PREFIX = "slot_auto_opened_";
+    private static final String KEY_SLOT_INSTALL_NOTICE_PREFIX = "slot_install_notice_";
     private static final int MAX_CLONE_APKS = 10;
     private static final String CATALOG_URL = "https://raw.githubusercontent.com/DesperadoBoi/TGSpaces/main/catalog/clones.json";
     private static final String RELEASE_BASE_URL = "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.2-release/";
@@ -256,6 +257,7 @@ public class MainActivity extends AppCompatActivity {
         if (isAppInstalled(packageName(slot))) {
             clearSlotDownload(slot);
             if (preferences.getInt(KEY_PENDING_SLOT, 0) == slot) {
+                showInstalledCloneNoticeOnce(slot);
                 preferences.edit()
                         .remove(KEY_PENDING_APK)
                         .remove(KEY_PENDING_SLOT)
@@ -466,6 +468,7 @@ public class MainActivity extends AppCompatActivity {
                 .remove(KEY_PENDING_DOWNLOAD_ID)
                 .remove(slotErrorKey(slot))
                 .remove(slotAutoOpenedKey(slot))
+                .remove(slotInstallNoticeKey(slot))
                 .apply();
         Toast.makeText(this, "Скачивание началось", Toast.LENGTH_SHORT).show();
         renderSlots();
@@ -528,7 +531,23 @@ public class MainActivity extends AppCompatActivity {
                 .putLong(KEY_PENDING_DOWNLOAD_ID, downloadId)
                 .remove(slotDownloadKey(slot))
                 .remove(slotErrorKey(slot))
+                .remove(slotInstallNoticeKey(slot))
                 .apply();
+    }
+
+    private void showInstalledCloneNoticeOnce(int slot) {
+        String noticeKey = slotInstallNoticeKey(slot);
+        if (preferences.getBoolean(noticeKey, false)) {
+            return;
+        }
+
+        preferences.edit().putBoolean(noticeKey, true).apply();
+        new AlertDialog.Builder(this)
+                .setTitle("Клон установлен")
+                .setMessage("Клон установлен. Если иконка в настройках Android отображается неправильно, откройте клон один раз или перезагрузите телефон.")
+                .setPositiveButton("Открыть клон", (dialog, which) -> openSlot(slot))
+                .setNegativeButton("ОК", null)
+                .show();
     }
 
     private void openInstallerOnce(int slot, long downloadId) {
@@ -884,6 +903,10 @@ public class MainActivity extends AppCompatActivity {
 
     private static String slotAutoOpenedKey(int slot) {
         return KEY_SLOT_AUTO_OPENED_PREFIX + slot;
+    }
+
+    private static String slotInstallNoticeKey(int slot) {
+        return KEY_SLOT_INSTALL_NOTICE_PREFIX + slot;
     }
 
     private int dp(int value) {
