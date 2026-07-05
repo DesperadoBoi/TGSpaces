@@ -60,6 +60,28 @@ function Get-CloneApkPaths {
     return $paths
 }
 
+function Get-FileSha256 {
+    param([string]$Path)
+
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
+function Update-AppCatalogSha256 {
+    param(
+        [string]$AppCatalogPath,
+        [string]$ReleaseTag,
+        [string]$ApkPath
+    )
+
+    Assert-FileExists -Path $AppCatalogPath -Description "TGSpaces app catalog"
+    $catalog = Get-Content -LiteralPath $AppCatalogPath -Raw | ConvertFrom-Json
+    $catalog.releaseTag = $ReleaseTag
+    $catalog.apkFileName = "TGSpaces-release.apk"
+    $catalog.apkUrl = "https://github.com/DesperadoBoi/TGSpaces/releases/download/$ReleaseTag/TGSpaces-release.apk"
+    $catalog | Add-Member -NotePropertyName "sha256" -NotePropertyValue (Get-FileSha256 -Path $ApkPath) -Force
+    $catalog | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $AppCatalogPath -Encoding UTF8
+}
+
 $tgSpacesPath = Split-Path -Parent $PSScriptRoot
 $telegramBasePathResolved = (Resolve-Path -LiteralPath $TelegramBasePath).Path
 $releaseApksPath = Join-Path $telegramBasePathResolved "dist\release-apks"
@@ -119,8 +141,10 @@ try {
 
     $tgSpacesReleaseApk = Join-Path $tgSpacesPath "app\build\outputs\apk\release\app-release.apk"
     $catalogPath = Join-Path $tgSpacesPath "catalog\clones.json"
+    $appCatalogPath = Join-Path $tgSpacesPath "catalog\app.json"
     Assert-FileExists -Path $tgSpacesReleaseApk -Description "TGSpaces release APK"
     Assert-FileExists -Path $catalogPath -Description "Clone catalog"
+    Update-AppCatalogSha256 -AppCatalogPath $appCatalogPath -ReleaseTag $ReleaseTag -ApkPath $tgSpacesReleaseApk
 
     $releaseKitPath = Join-Path $tgSpacesPath "dist\github-release\$ReleaseTag"
     if (Test-Path -LiteralPath $releaseKitPath) {
@@ -134,6 +158,7 @@ try {
         Copy-Item -LiteralPath $cloneApkPath -Destination $releaseKitPath
     }
     Copy-Item -LiteralPath $catalogPath -Destination (Join-Path $releaseKitPath "clones.json")
+    Copy-Item -LiteralPath $appCatalogPath -Destination (Join-Path $releaseKitPath "app.json")
 
     $releaseFiles = Get-ChildItem -LiteralPath $releaseKitPath -File | Sort-Object Name
     $assetList = ($releaseFiles | ForEach-Object { "- $($_.Name)" }) -join [Environment]::NewLine
@@ -150,12 +175,12 @@ $assetList
 
 1. Create a GitHub Release with tag `$ReleaseTag`.
 2. Upload all APK files from this folder.
-3. After the assets are uploaded, push `catalog/clones.json` if it changed.
+3. After the assets are uploaded, push `catalog/clones.json` and `catalog/app.json` if they changed.
 4. Update the `TGSpaces-release.apk` asset.
 
 ## Warning
 
-Push `catalog/clones.json` only after uploading APK assets to the GitHub Release. Otherwise already installed TGSpaces builds may see the new `releaseTag` before the assets exist and receive 404 errors.
+Push `catalog/clones.json` and `catalog/app.json` only after uploading APK assets to the GitHub Release. Otherwise already installed TGSpaces builds may see the new `releaseTag` before the assets exist and receive 404 errors.
 "@
     Set-Content -LiteralPath (Join-Path $releaseKitPath "RELEASE_CHECKLIST.md") -Value $checklist -Encoding UTF8
 

@@ -58,6 +58,12 @@ function Read-ApkBadging {
     }
 }
 
+function Get-FileSha256 {
+    param([string]$Path)
+
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $catalogPath = Join-Path $repoRoot "catalog\clones.json"
 $releaseApksPath = Join-Path $TelegramBasePath "dist\release-apks"
@@ -92,6 +98,7 @@ foreach ($slot in 1..10) {
         apkUrl = "https://github.com/DesperadoBoi/TGSpaces/releases/download/$ReleaseTag/$apkFileName"
         versionName = $badging.VersionName
         versionCode = $badging.VersionCode
+        sha256 = Get-FileSha256 -Path $apkPath
     }
 }
 

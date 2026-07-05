@@ -77,6 +77,47 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/appUpdateBanner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="@dimen/section_gap"
+            android:background="@drawable/slot_card_update_background"
+            android:orientation="vertical"
+            android:padding="@dimen/card_padding"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/appUpdateTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Доступно обновление TGSpaces"
+                android:textColor="@color/text_primary"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/appUpdateText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:lineSpacingExtra="2dp"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/buttonDownloadAppUpdate"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/button_primary_background"
+                android:minHeight="44dp"
+                android:text="Скачать обновление"
+                android:textAllCaps="false"
+                android:textColor="@color/text_primary"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
             android:id="@+id/slotsContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

@@ -40,10 +40,13 @@ import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -590,7 +593,8 @@ public class MainActivity extends AppCompatActivity {
                 requiredString(root, "apkFileName"),
                 requiredString(root, "apkUrl"),
                 requiredString(root, "versionName"),
-                root.getLong("versionCode")
+                root.getLong("versionCode"),
+                optionalString(root, "sha256")
         );
     }
 
@@ -736,6 +740,12 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        if (!verifyDownloadedCloneApk(slot, info)) {
+            showDownloadError(slot, "Ошибка проверки SHA-256 APK");
+            clearSlotDownload(slot);
+            return;
+        }
+
         markDownloadReadyForInstall(slot, downloadId, info);
         renderSlots();
         if (autoOpen) {
@@ -754,6 +764,11 @@ public class MainActivity extends AppCompatActivity {
                 continue;
             }
             if (info.status == DownloadManager.STATUS_SUCCESSFUL) {
+                if (!verifyDownloadedCloneApk(slot, info)) {
+                    storeDownloadError(slot, "Ошибка проверки SHA-256 APK");
+                    clearSlotDownload(slot);
+                    continue;
+                }
                 markDownloadReadyForInstall(slot, downloadId, info);
                 if (autoOpen) {
                     openInstallerOnce(slot, downloadId);
@@ -816,6 +831,23 @@ public class MainActivity extends AppCompatActivity {
                     .remove(KEY_APP_UPDATE_DOWNLOAD_ID)
                     .remove(KEY_APP_UPDATE_APK_PATH)
                     .apply();
+            return;
+        }
+
+        Uri hashUri = downloadInfoUri(info);
+        if (hashUri == null) {
+            hashUri = Uri.fromFile(apkFile);
+        }
+        if (!verifyApkSha256("TGSpaces update", appUpdateInfo != null ? appUpdateInfo.sha256 : null, hashUri, null)) {
+            preferences.edit()
+                    .remove(KEY_APP_UPDATE_DOWNLOAD_ID)
+                    .remove(KEY_APP_UPDATE_APK_PATH)
+                    .apply();
+            new AlertDialog.Builder(this)
+                    .setTitle("Ошибка загрузки")
+                    .setMessage("SHA-256 скачанного обновления TGSpaces не совпадает с каталогом. Установщик не будет открыт.")
+                    .setPositiveButton("OK", null)
+                    .show();
             return;
         }
 
@@ -914,6 +946,11 @@ public class MainActivity extends AppCompatActivity {
             uri = resolveInstallerUri(slot, downloadId);
             if (uri == null) {
                 throw new IllegalStateException("No APK URI available");
+            }
+
+            if (!verifyCloneInstallerUri(slot, uri)) {
+                showDownloadError(slot, "Ошибка проверки SHA-256 APK");
+                return false;
             }
 
             Intent intent = new Intent(Intent.ACTION_VIEW);
@@ -1073,6 +1110,99 @@ public class MainActivity extends AppCompatActivity {
                 + " (" + downloadReasonToMessage(reason) + ")");
     }
 
+    private boolean verifyDownloadedCloneApk(int slot, DownloadInfo info) {
+        Uri uri = downloadInfoUri(info);
+        if (uri == null) {
+            File fallback = expectedApkFile(slot);
+            if (fallback.exists()) {
+                uri = Uri.fromFile(fallback);
+            }
+        }
+        return verifyApkSha256("slot=" + slot, expectedCloneSha256(slot), uri, slot);
+    }
+
+    private boolean verifyCloneInstallerUri(int slot, Uri uri) {
+        return verifyApkSha256("slot=" + slot, expectedCloneSha256(slot), uri, slot);
+    }
+
+    private String expectedCloneSha256(int slot) {
+        CloneInfo cloneInfo = cloneCatalog.get(slot);
+        return cloneInfo != null ? cloneInfo.sha256 : null;
+    }
+
+    private boolean verifyApkSha256(String label, String expectedSha256, Uri uri, Integer slot) {
+        if (expectedSha256 == null || expectedSha256.trim().isEmpty()) {
+            Log.w(TAG, "APK SHA-256 missing, skipping verification: " + label);
+            return true;
+        }
+        if (uri == null) {
+            Log.w(TAG, "APK SHA-256 mismatch: " + label + ", expected=" + expectedSha256 + ", actual=missing-uri");
+            return false;
+        }
+
+        try {
+            Log.d(TAG, "Verifying APK SHA-256... " + label);
+            String actualSha256 = calculateSha256(uri);
+            if (expectedSha256.equalsIgnoreCase(actualSha256)) {
+                Log.d(TAG, "APK SHA-256 verified: " + label);
+                return true;
+            }
+
+            String slotText = slot != null ? ", slot=" + slot : "";
+            Log.w(TAG, "APK SHA-256 mismatch: " + label + slotText
+                    + ", expected=" + expectedSha256
+                    + ", actual=" + actualSha256);
+            return false;
+        } catch (Exception e) {
+            Log.w(TAG, "APK SHA-256 mismatch: " + label + ", expected=" + expectedSha256 + ", actual=read-error", e);
+            return false;
+        }
+    }
+
+    private String calculateSha256(Uri uri) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        try (InputStream inputStream = openUriForHash(uri)) {
+            if (inputStream == null) {
+                throw new IllegalStateException("Could not open APK uri for hashing: " + uri);
+            }
+
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = inputStream.read(buffer)) != -1) {
+                digest.update(buffer, 0, read);
+            }
+        }
+        return bytesToHex(digest.digest());
+    }
+
+    private InputStream openUriForHash(Uri uri) throws Exception {
+        if ("file".equals(uri.getScheme())) {
+            return new FileInputStream(new File(uri.getPath()));
+        }
+        if ("content".equals(uri.getScheme())) {
+            return getContentResolver().openInputStream(uri);
+        }
+        if (uri.getScheme() == null && uri.getPath() != null) {
+            return new FileInputStream(new File(uri.getPath()));
+        }
+        return getContentResolver().openInputStream(uri);
+    }
+
+    private static String bytesToHex(byte[] bytes) {
+        StringBuilder builder = new StringBuilder(bytes.length * 2);
+        for (byte value : bytes) {
+            builder.append(String.format(Locale.US, "%02x", value & 0xff));
+        }
+        return builder.toString();
+    }
+
+    private Uri downloadInfoUri(DownloadInfo info) {
+        if (info != null && info.localUri != null) {
+            return Uri.parse(info.localUri);
+        }
+        return null;
+    }
+
     private void loadCloneCatalog() {
         new Thread(() -> {
             HttpURLConnection connection = null;
@@ -1133,7 +1263,8 @@ public class MainActivity extends AppCompatActivity {
                     requiredString(item, "apkFileName"),
                     requiredString(item, "apkUrl"),
                     item.optString("versionName", ""),
-                    item.has("versionCode") && !item.isNull("versionCode") ? item.getLong("versionCode") : null
+                    item.has("versionCode") && !item.isNull("versionCode") ? item.getLong("versionCode") : null,
+                    optionalString(item, "sha256")
             );
             parsedCatalog.put(slot, cloneInfo);
         }
@@ -1150,6 +1281,14 @@ public class MainActivity extends AppCompatActivity {
             throw new IllegalArgumentException("Missing " + name);
         }
         return value;
+    }
+
+    private static String optionalString(JSONObject object, String name) {
+        if (!object.has(name) || object.isNull(name)) {
+            return null;
+        }
+        String value = object.optString(name, "").trim();
+        return value.isEmpty() ? null : value;
     }
 
     private String downloadReasonToMessage(int reason) {
@@ -1427,8 +1566,9 @@ public class MainActivity extends AppCompatActivity {
         final String apkUrl;
         final String versionName;
         final long versionCode;
+        final String sha256;
 
-        AppUpdateInfo(String appName, String packageName, String releaseTag, String apkFileName, String apkUrl, String versionName, long versionCode) {
+        AppUpdateInfo(String appName, String packageName, String releaseTag, String apkFileName, String apkUrl, String versionName, long versionCode, String sha256) {
             this.appName = appName;
             this.packageName = packageName;
             this.releaseTag = releaseTag;
@@ -1436,6 +1576,7 @@ public class MainActivity extends AppCompatActivity {
             this.apkUrl = apkUrl;
             this.versionName = versionName;
             this.versionCode = versionCode;
+            this.sha256 = sha256;
         }
     }
 
@@ -1447,8 +1588,9 @@ public class MainActivity extends AppCompatActivity {
         final String apkUrl;
         final String versionName;
         final Long versionCode;
+        final String sha256;
 
-        CloneInfo(int slot, String name, String packageName, String apkFileName, String apkUrl, String versionName, Long versionCode) {
+        CloneInfo(int slot, String name, String packageName, String apkFileName, String apkUrl, String versionName, Long versionCode, String sha256) {
             this.slot = slot;
             this.name = name;
             this.packageName = packageName;
@@ -1456,6 +1598,7 @@ public class MainActivity extends AppCompatActivity {
             this.apkUrl = apkUrl;
             this.versionName = versionName;
             this.versionCode = versionCode;
+            this.sha256 = sha256;
         }
     }
 }
