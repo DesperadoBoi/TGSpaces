@@ -23,6 +23,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -63,7 +64,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String KEY_SLOT_DOWNLOAD_PREFIX = "slot_download_";
     private static final String KEY_SLOT_ERROR_PREFIX = "slot_error_";
     private static final String KEY_SLOT_AUTO_OPENED_PREFIX = "slot_auto_opened_";
-    private static final String KEY_SLOT_INSTALL_NOTICE_PREFIX = "slot_install_notice_";
+    private static final String KEY_SLOT_HIDDEN_PREFIX = "slot_hidden_";
     private static final String KEY_FIRST_LAUNCH_HELP_SHOWN = "first_launch_help_shown";
     private static final String KEY_APP_UPDATE_DOWNLOAD_ID = "app_update_download_id";
     private static final String KEY_APP_UPDATE_APK_PATH = "app_update_apk_path";
@@ -85,6 +86,7 @@ public class MainActivity extends AppCompatActivity {
     private LinearLayout slotsContainer;
     private Button manualUpdateButton;
     private int visibleSlotCount = 1;
+    private boolean slotVisibilityLogged;
 
     private final Runnable progressRunnable = new Runnable() {
         @Override
@@ -169,13 +171,17 @@ public class MainActivity extends AppCompatActivity {
 
     private void renderSlots() {
         int savedSlotCount = Math.max(1, preferences.getInt(KEY_SLOT_COUNT, 1));
-        visibleSlotCount = Math.min(MAX_CLONE_APKS, Math.max(savedSlotCount, highestInstalledSlot()));
+        visibleSlotCount = Math.min(MAX_CLONE_APKS, Math.max(savedSlotCount, highestRequiredSlot()));
         if (visibleSlotCount != savedSlotCount) {
             preferences.edit().putInt(KEY_SLOT_COUNT, visibleSlotCount).apply();
         }
+        logSlotVisibilityStateOnce();
 
         slotsContainer.removeAllViews();
         for (int slot = 1; slot <= visibleSlotCount; slot++) {
+            if (isSlotHidden(slot) && !isAppInstalled(packageName(slot))) {
+                continue;
+            }
             slotsContainer.addView(createSlotCard(slot));
         }
         scheduleProgressRefreshIfNeeded();
@@ -236,40 +242,33 @@ public class MainActivity extends AppCompatActivity {
 
         switch (state.type) {
             case UPDATE_AVAILABLE:
-                addButtonRow(card,
+                addActionRow(card,
                         createButton("Обновить", true, true, view -> downloadCloneApk(slot)),
-                        createButton("Открыть", false, true, view -> openSlot(slot)));
-                addButtonRow(card,
-                        createButton("Настройки", false, true, view -> openAppSettings(slot)),
-                        createButton("Переименовать", false, true, view -> showRenameDialog(slot)));
+                        createMenuButton(view -> showSlotMenu(view, slot, state.type)));
                 break;
             case INSTALLED:
-                addButtonRow(card,
+                addActionRow(card,
                         createButton("Открыть", true, true, view -> openSlot(slot)),
-                        createButton("Настройки", false, true, view -> openAppSettings(slot)));
-                card.addView(createButton("Переименовать", false, true, view -> showRenameDialog(slot)));
+                        createMenuButton(view -> showSlotMenu(view, slot, state.type)));
                 break;
             case DOWNLOADING:
-                card.addView(createButton("Скачивается...", true, false, null));
-                addButtonRow(card,
-                        createButton("Отменить", false, true, view -> cancelCloneDownload(slot)),
-                        createButton("Переименовать", false, true, view -> showRenameDialog(slot)));
+                card.addView(createButton("Отменить", true, true, view -> cancelCloneDownload(slot)));
                 break;
             case WAITING_INSTALL:
-                card.addView(createButton("Открыть установщик", true, true, view -> openInstallerForDownloadedApk(slot, getKnownDownloadId(slot))));
-                addButtonRow(card,
-                        createButton("Скачать заново", false, true, view -> restartCloneDownload(slot)),
-                        createButton("Переименовать", false, true, view -> showRenameDialog(slot)));
+                addActionRow(card,
+                        createButton("Открыть установщик", true, true, view -> openInstallerForDownloadedApk(slot, getKnownDownloadId(slot))),
+                        createMenuButton(view -> showSlotMenu(view, slot, state.type)));
                 break;
             case DOWNLOAD_ERROR:
-                addButtonRow(card,
+                addActionRow(card,
                         createButton("Повторить", true, true, view -> retryCloneDownload(slot)),
-                        createButton("Переименовать", false, true, view -> showRenameDialog(slot)));
+                        createMenuButton(view -> showSlotMenu(view, slot, state.type)));
                 break;
             case NOT_INSTALLED:
             default:
-                card.addView(createButton("Установить клон", true, true, view -> showInstallDialog(slot)));
-                card.addView(createButton("Переименовать", false, true, view -> showRenameDialog(slot)));
+                addActionRow(card,
+                        createButton("Установить", true, true, view -> showInstallDialog(slot)),
+                        createMenuButton(view -> showSlotMenu(view, slot, state.type)));
                 break;
         }
 
@@ -307,6 +306,35 @@ public class MainActivity extends AppCompatActivity {
         card.addView(row);
     }
 
+    private void addActionRow(LinearLayout card, Button primaryButton, Button menuButton) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        rowParams.topMargin = dp(8);
+        row.setLayoutParams(rowParams);
+
+        LinearLayout.LayoutParams primaryParams = new LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1
+        );
+        primaryParams.setMargins(0, 0, dp(8), 0);
+        primaryButton.setLayoutParams(primaryParams);
+
+        LinearLayout.LayoutParams menuParams = new LinearLayout.LayoutParams(
+                dp(52),
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        menuButton.setLayoutParams(menuParams);
+
+        row.addView(primaryButton);
+        row.addView(menuButton);
+        card.addView(row);
+    }
+
     private Button createButton(String text, boolean primary, boolean enabled, View.OnClickListener listener) {
         Button button = new Button(this);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
@@ -326,6 +354,70 @@ public class MainActivity extends AppCompatActivity {
             button.setOnClickListener(listener);
         }
         return button;
+    }
+
+    private Button createMenuButton(View.OnClickListener listener) {
+        Button button = new Button(this);
+        button.setText("⋮");
+        button.setAllCaps(false);
+        button.setEnabled(true);
+        button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        button.setMinHeight(dp(44));
+        button.setTextColor(Color.parseColor("#F8FAFC"));
+        button.setBackgroundResource(R.drawable.button_secondary_background);
+        button.setOnClickListener(listener);
+        return button;
+    }
+
+    private void showSlotMenu(View anchor, int slot, SlotStateType stateType) {
+        PopupMenu menu = new PopupMenu(this, anchor);
+
+        switch (stateType) {
+            case INSTALLED:
+                menu.getMenu().add("Переименовать");
+                menu.getMenu().add("Настройки");
+                menu.getMenu().add("Удалить клон");
+                break;
+            case UPDATE_AVAILABLE:
+                menu.getMenu().add("Открыть");
+                menu.getMenu().add("Настройки");
+                menu.getMenu().add("Переименовать");
+                menu.getMenu().add("Удалить клон");
+                break;
+            case WAITING_INSTALL:
+                menu.getMenu().add("Скачать заново");
+                menu.getMenu().add("Скрыть слот");
+                break;
+            case DOWNLOAD_ERROR:
+                menu.getMenu().add("Скрыть слот");
+                break;
+            case NOT_INSTALLED:
+                menu.getMenu().add("Переименовать");
+                menu.getMenu().add("Скрыть слот");
+                break;
+            case DOWNLOADING:
+            default:
+                return;
+        }
+
+        menu.setOnMenuItemClickListener(item -> {
+            String title = item.getTitle().toString();
+            if ("Открыть".equals(title)) {
+                openSlot(slot);
+            } else if ("Настройки".equals(title)) {
+                openAppSettings(slot);
+            } else if ("Переименовать".equals(title)) {
+                showRenameDialog(slot);
+            } else if ("Удалить клон".equals(title)) {
+                requestUninstallClone(slot);
+            } else if ("Скачать заново".equals(title)) {
+                restartCloneDownload(slot);
+            } else if ("Скрыть слот".equals(title)) {
+                hideSlot(slot);
+            }
+            return true;
+        });
+        menu.show();
     }
 
     private void showFirstLaunchDialogIfNeeded() {
@@ -356,7 +448,6 @@ public class MainActivity extends AppCompatActivity {
                                 + "4. Подтвердите установку в системном установщике Android.\n\n"
                                 + "Важно:\n"
                                 + "- Для установки может потребоваться разрешение \"Установка неизвестных приложений\".\n"
-                                + "- Если иконка в настройках Android отображается неправильно, откройте клон один раз или перезагрузите телефон.\n"
                                 + "- TGSpaces не является официальным приложением Telegram."
                 )
                 .setPositiveButton("ОК", null)
@@ -394,7 +485,6 @@ public class MainActivity extends AppCompatActivity {
 
         if (hasPendingApk(slot)) {
             if (installedCloneInfo != null && isInstalledCloneCurrent(slot, installedCloneInfo)) {
-                showInstalledCloneNoticeOnce(slot);
                 clearPendingCloneInstall(slot);
                 return installedSlotState(slot, installedCloneInfo);
             }
@@ -429,13 +519,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void addSlot() {
-        int emptySlot = firstVisibleEmptySlot();
-        if (emptySlot > 0) {
-            new AlertDialog.Builder(this)
-                    .setTitle("Пустой слот уже есть")
-                    .setMessage("У вас уже есть пустой слот: " + cloneName(emptySlot) + ". Сначала установите клон в него.")
-                    .setPositiveButton("OK", null)
-                    .show();
+        int hiddenSlot = firstHiddenSlot();
+        if (hiddenSlot > 0) {
+            preferences.edit()
+                    .remove(slotHiddenKey(hiddenSlot))
+                    .putInt(KEY_SLOT_COUNT, Math.max(visibleSlotCount, hiddenSlot))
+                    .apply();
+            Log.d(TAG, "hidden slot restored: slot=" + hiddenSlot);
+            renderSlots();
             return;
         }
 
@@ -452,23 +543,67 @@ public class MainActivity extends AppCompatActivity {
         renderSlots();
     }
 
-    private int firstVisibleEmptySlot() {
-        for (int slot = 1; slot <= visibleSlotCount; slot++) {
-            if (!isAppInstalled(packageName(slot))) {
+    private int firstHiddenSlot() {
+        for (int slot = 1; slot <= MAX_CLONE_APKS; slot++) {
+            if (isSlotHidden(slot) && !isAppInstalled(packageName(slot))) {
                 return slot;
             }
         }
         return 0;
     }
 
-    private int highestInstalledSlot() {
+    private int highestRequiredSlot() {
         int highest = 0;
         for (int slot = 1; slot <= MAX_CLONE_APKS; slot++) {
-            if (isAppInstalled(packageName(slot))) {
+            if (isSlotRequired(slot)) {
                 highest = slot;
             }
         }
         return highest;
+    }
+
+    private boolean isSlotRequired(int slot) {
+        return isAppInstalled(packageName(slot))
+                || hasPendingApk(slot)
+                || preferences.getLong(slotDownloadKey(slot), -1L) > 0
+                || preferences.getString(slotErrorKey(slot), null) != null;
+    }
+
+    private boolean isSlotHidden(int slot) {
+        return preferences.getBoolean(slotHiddenKey(slot), false);
+    }
+
+    private void hideSlot(int slot) {
+        if (isAppInstalled(packageName(slot))) {
+            renderSlots();
+            return;
+        }
+
+        preferences.edit().putBoolean(slotHiddenKey(slot), true).apply();
+        Log.d(TAG, "slot hidden: slot=" + slot);
+        renderSlots();
+    }
+
+    private void logSlotVisibilityStateOnce() {
+        if (slotVisibilityLogged) {
+            return;
+        }
+        slotVisibilityLogged = true;
+        Log.d(TAG, "slot visibility state loaded: visibleSlotCount=" + visibleSlotCount
+                + ", hiddenSlots=" + hiddenSlotsForLog());
+    }
+
+    private String hiddenSlotsForLog() {
+        StringBuilder builder = new StringBuilder();
+        for (int slot = 1; slot <= MAX_CLONE_APKS; slot++) {
+            if (isSlotHidden(slot)) {
+                if (builder.length() > 0) {
+                    builder.append(',');
+                }
+                builder.append(slot);
+            }
+        }
+        return builder.length() == 0 ? "none" : builder.toString();
     }
 
     private void showRenameDialog(int slot) {
@@ -514,6 +649,37 @@ public class MainActivity extends AppCompatActivity {
         Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
         intent.setData(Uri.parse("package:" + packageName(slot)));
         startActivity(intent);
+    }
+
+    private void requestUninstallClone(int slot) {
+        String packageName = packageName(slot);
+        if (!isAppInstalled(packageName)) {
+            Log.d(TAG, "clone already not installed: slot=" + slot + ", packageName=" + packageName);
+            Toast.makeText(this, "Клон уже не установлен", Toast.LENGTH_SHORT).show();
+            renderSlots();
+            return;
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("Удалить клон?")
+                .setMessage("Откроются настройки " + cloneName(slot) + ". На системном экране нажмите «Удалить».")
+                .setPositiveButton("Открыть настройки", (dialog, which) -> openCloneSettingsForUninstall(slot, packageName))
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void openCloneSettingsForUninstall(int slot, String packageName) {
+        Log.d(TAG, "uninstall settings requested: slot=" + slot + ", packageName=" + packageName);
+        try {
+            Intent settings = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            settings.setData(Uri.parse("package:" + packageName));
+            startActivity(settings);
+            Log.d(TAG, "uninstall settings opened: slot=" + slot + ", packageName=" + packageName);
+            Toast.makeText(this, "На экране настроек нажмите «Удалить»", Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            Log.w(TAG, "uninstall settings failed: slot=" + slot + ", packageName=" + packageName, e);
+            Toast.makeText(this, "Не удалось открыть настройки клона", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void showInstallDialog(int slot) {
@@ -805,7 +971,6 @@ public class MainActivity extends AppCompatActivity {
                 .remove(KEY_PENDING_DOWNLOAD_ID)
                 .remove(slotErrorKey(slot))
                 .remove(slotAutoOpenedKey(slot))
-                .remove(slotInstallNoticeKey(slot))
                 .apply();
         Toast.makeText(this, "Скачивание началось", Toast.LENGTH_SHORT).show();
         renderSlots();
@@ -1053,23 +1218,7 @@ public class MainActivity extends AppCompatActivity {
                 .putLong(KEY_PENDING_DOWNLOAD_ID, downloadId)
                 .remove(slotDownloadKey(slot))
                 .remove(slotErrorKey(slot))
-                .remove(slotInstallNoticeKey(slot))
                 .apply();
-    }
-
-    private void showInstalledCloneNoticeOnce(int slot) {
-        String noticeKey = slotInstallNoticeKey(slot);
-        if (preferences.getBoolean(noticeKey, false)) {
-            return;
-        }
-
-        preferences.edit().putBoolean(noticeKey, true).apply();
-        new AlertDialog.Builder(this)
-                .setTitle("Клон установлен")
-                .setMessage("Клон установлен. Если иконка в настройках Android отображается неправильно, откройте клон один раз или перезагрузите телефон.")
-                .setPositiveButton("Открыть клон", (dialog, which) -> openSlot(slot))
-                .setNegativeButton("ОК", null)
-                .show();
     }
 
     private void openInstallerOnce(int slot, long downloadId) {
@@ -1256,7 +1405,6 @@ public class MainActivity extends AppCompatActivity {
                 .remove(KEY_PENDING_SLOT)
                 .remove(KEY_PENDING_DOWNLOAD_ID)
                 .remove(slotAutoOpenedKey(slot))
-                .remove(slotInstallNoticeKey(slot))
                 .apply();
     }
 
@@ -1594,8 +1742,8 @@ public class MainActivity extends AppCompatActivity {
         return KEY_SLOT_AUTO_OPENED_PREFIX + slot;
     }
 
-    private static String slotInstallNoticeKey(int slot) {
-        return KEY_SLOT_INSTALL_NOTICE_PREFIX + slot;
+    private static String slotHiddenKey(int slot) {
+        return KEY_SLOT_HIDDEN_PREFIX + slot;
     }
 
     private int dp(int value) {
