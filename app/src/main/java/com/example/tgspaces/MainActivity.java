@@ -71,7 +71,8 @@ public class MainActivity extends AppCompatActivity {
     private static final String KEY_SLOT_ERROR_PREFIX = "slot_error_";
     private static final String KEY_SLOT_AUTO_OPENED_PREFIX = "slot_auto_opened_";
     private static final String KEY_SLOT_HIDDEN_PREFIX = "slot_hidden_";
-    private static final String KEY_FIRST_LAUNCH_HELP_SHOWN = "first_launch_help_shown";
+    static final String KEY_ONBOARDING_SEEN = "onboarding_seen";
+    static final String EXTRA_SHOW_ONBOARDING = "show_onboarding";
     private static final String KEY_DISPLAY_MODE_COMPACT = "display_mode_compact";
     private static final String KEY_DISPLAY_MODE = "display_mode";
     private static final String KEY_THEME_MODE = "theme_mode";
@@ -106,6 +107,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView filterInstalledButton;
     private TextView filterFreeButton;
     private TextView filterUpdatesButton;
+    private AlertDialog onboardingDialog;
     private int visibleSlotCount = 1;
     private boolean slotVisibilityLogged;
     private DisplayMode displayMode = DisplayMode.CARDS;
@@ -197,7 +199,19 @@ public class MainActivity extends AppCompatActivity {
         renderSlots();
         loadCloneCatalog();
         loadAppCatalog();
-        showFirstLaunchDialogIfNeeded();
+        showOnboardingIfNeeded();
+        if (getIntent().getBooleanExtra(EXTRA_SHOW_ONBOARDING, false)) {
+            showOnboarding();
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (intent != null && intent.getBooleanExtra(EXTRA_SHOW_ONBOARDING, false)) {
+            showOnboarding();
+        }
     }
 
     @Override
@@ -1036,18 +1050,30 @@ public class MainActivity extends AppCompatActivity {
         menu.show();
     }
 
-    private void showFirstLaunchDialogIfNeeded() {
-        if (preferences.getBoolean(KEY_FIRST_LAUNCH_HELP_SHOWN, false)) {
+    private void showOnboardingIfNeeded() {
+        if (preferences.getBoolean(KEY_ONBOARDING_SEEN, false)) {
             return;
         }
 
-        preferences.edit().putBoolean(KEY_FIRST_LAUNCH_HELP_SHOWN, true).apply();
-        new AlertDialog.Builder(this)
-                .setTitle("TGSpaces")
-                .setMessage("TGSpaces помогает устанавливать отдельные копии Telegram. Каждый слот — отдельное приложение и отдельный вход в аккаунт.")
-                .setPositiveButton("Понятно", null)
-                .setNegativeButton("Помощь", (dialog, which) -> showHelpDialog())
-                .show();
+        showOnboarding();
+    }
+
+    private void showOnboarding() {
+        if (onboardingDialog != null && onboardingDialog.isShowing()) {
+            return;
+        }
+
+        View content = getLayoutInflater().inflate(R.layout.dialog_onboarding, null);
+        onboardingDialog = new AlertDialog.Builder(this)
+                .setView(content)
+                .create();
+        content.findViewById(R.id.buttonOnboardingDone).setOnClickListener(view -> {
+            preferences.edit().putBoolean(KEY_ONBOARDING_SEEN, true).apply();
+            onboardingDialog.dismiss();
+        });
+        content.findViewById(R.id.buttonOnboardingHelp).setOnClickListener(view -> showHelpDialog());
+        onboardingDialog.setOnDismissListener(dialog -> onboardingDialog = null);
+        onboardingDialog.show();
     }
 
     private void showHelpDialog() {

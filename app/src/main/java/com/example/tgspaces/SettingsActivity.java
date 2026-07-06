@@ -1,6 +1,7 @@
 package com.example.tgspaces;
 
 import android.app.DownloadManager;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -90,6 +91,7 @@ public class SettingsActivity extends AppCompatActivity {
         findViewById(R.id.buttonCleanupApks).setOnClickListener(view -> confirmCleanupDownloads());
         findViewById(R.id.buttonWhatIsSlot).setOnClickListener(view -> showWhatIsSlotDialog());
         findViewById(R.id.buttonHowInstall).setOnClickListener(view -> showInstallHelpDialog());
+        findViewById(R.id.buttonShowOnboarding).setOnClickListener(view -> showOnboardingAgain());
         findViewById(R.id.buttonAbout).setOnClickListener(view -> showAboutDialog());
 
         updateThemeValueText();
@@ -484,6 +486,14 @@ public class SettingsActivity extends AppCompatActivity {
                 )
                 .setPositiveButton("OK", null)
                 .show();
+    }
+
+    private void showOnboardingAgain() {
+        preferences.edit().putBoolean(MainActivity.KEY_ONBOARDING_SEEN, false).apply();
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.putExtra(MainActivity.EXTRA_SHOW_ONBOARDING, true);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        startActivity(intent);
     }
 
     private void showAboutDialog() {
