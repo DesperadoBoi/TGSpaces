@@ -17,6 +17,7 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
+import android.content.res.Configuration;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -156,8 +157,10 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.buttonAddSlot).setOnClickListener(view -> addSlot());
         displayModeToggleButton.setOnClickListener(view -> setDisplayMode(!compactDisplayMode));
         findViewById(R.id.buttonSettings).setOnClickListener(view -> openSettings());
+        findViewById(R.id.buttonThemeToggle).setOnClickListener(view -> toggleLightDarkTheme());
         appUpdateButton.setOnClickListener(view -> downloadAppUpdate());
         updateDisplayModeToggleText();
+        updateThemeToggleButton();
 
         IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
         ContextCompat.registerReceiver(this, downloadReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
@@ -254,6 +257,32 @@ public class MainActivity extends AppCompatActivity {
         recreate();
     }
 
+    private void toggleLightDarkTheme() {
+        boolean currentlyDark = isCurrentlyDarkTheme();
+        setThemeMode(currentlyDark ? THEME_MODE_LIGHT : THEME_MODE_DARK);
+    }
+
+    private boolean isCurrentlyDarkTheme() {
+        if (THEME_MODE_DARK.equals(themeMode)) {
+            return true;
+        }
+        if (THEME_MODE_LIGHT.equals(themeMode)) {
+            return false;
+        }
+        int nightMode = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
+        return nightMode == Configuration.UI_MODE_NIGHT_YES;
+    }
+
+    private void updateThemeToggleButton() {
+        Button button = findViewById(R.id.buttonThemeToggle);
+        if (button == null) {
+            return;
+        }
+        button.setText(isCurrentlyDarkTheme() ? "☀" : "☾");
+        button.setTextColor(ContextCompat.getColor(this, R.color.button_secondary_text));
+        button.setBackgroundResource(R.drawable.button_overflow_background);
+    }
+
     private void applyThemeMode(String mode) {
         int nightMode;
         if (THEME_MODE_LIGHT.equals(mode)) {
@@ -264,6 +293,10 @@ public class MainActivity extends AppCompatActivity {
             nightMode = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM;
         }
         AppCompatDelegate.setDefaultNightMode(nightMode);
+    }
+
+    private int statusColor(SlotState state) {
+        return state.statusColorRes;
     }
 
     private View renderCardSlot(int slot) {
@@ -300,7 +333,7 @@ public class MainActivity extends AppCompatActivity {
         statusParams.topMargin = dp(2);
         status.setLayoutParams(statusParams);
         status.setText(compactStatusText(slot, state));
-        status.setTextColor(ContextCompat.getColor(this, state.statusColorRes));
+        status.setTextColor(ContextCompat.getColor(this, statusColor(state)));
         status.setTextSize(14);
         card.addView(status);
 
@@ -369,7 +402,7 @@ public class MainActivity extends AppCompatActivity {
         statusParams.topMargin = dp(2);
         status.setLayoutParams(statusParams);
         status.setText(compactStatusText(slot, state));
-        status.setTextColor(ContextCompat.getColor(this, state.statusColorRes));
+        status.setTextColor(ContextCompat.getColor(this, statusColor(state)));
         status.setTextSize(12);
         textColumn.addView(status);
 

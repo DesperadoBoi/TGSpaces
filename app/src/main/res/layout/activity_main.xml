@@ -31,6 +31,21 @@
                 android:textStyle="bold" />
 
             <Button
+                android:id="@+id/buttonThemeToggle"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/button_overflow_background"
+                android:minWidth="36dp"
+                android:minHeight="36dp"
+                android:padding="0dp"
+                android:text="☾"
+                android:textAllCaps="false"
+                android:textColor="@color/button_secondary_text"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <Button
                 android:id="@+id/buttonSettings"
                 android:layout_width="36dp"
                 android:layout_height="36dp"

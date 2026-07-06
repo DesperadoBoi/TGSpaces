@@ -1,10 +1,14 @@
 package com.example.tgspaces;
 
+import android.app.DownloadManager;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.util.Log;
 import android.view.View;
 import android.widget.PopupMenu;
@@ -14,6 +18,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -22,6 +27,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -31,7 +37,17 @@ public class SettingsActivity extends AppCompatActivity {
 
     private static final String TAG = "TGSpaces";
     private static final String PREFS_NAME = "slot_names";
+    private static final String KEY_PENDING_APK = "pending_apk_path";
+    private static final String KEY_PENDING_SLOT = "pending_slot";
+    private static final String KEY_PENDING_DOWNLOAD_ID = "pending_download_id";
+    private static final String KEY_DOWNLOAD_SLOT_PREFIX = "download_slot_";
+    private static final String KEY_SLOT_DOWNLOAD_PREFIX = "slot_download_";
+    private static final String KEY_SLOT_ERROR_PREFIX = "slot_error_";
+    private static final String KEY_SLOT_AUTO_OPENED_PREFIX = "slot_auto_opened_";
     private static final String KEY_THEME_MODE = "theme_mode";
+    private static final String KEY_APP_UPDATE_DOWNLOAD_ID = "app_update_download_id";
+    private static final String KEY_APP_UPDATE_APK_PATH = "app_update_apk_path";
+    private static final String KEY_APP_UPDATE_DOWNLOAD_FAILED = "app_update_download_failed";
     private static final String KEY_SETTINGS_CATALOG_REFRESHED = "settings_catalog_refreshed";
     private static final String KEY_SETTINGS_CATALOG_LABEL = "settings_catalog_label";
     private static final String THEME_MODE_SYSTEM = "system";
@@ -39,12 +55,14 @@ public class SettingsActivity extends AppCompatActivity {
     private static final String THEME_MODE_DARK = "dark";
     private static final String CATALOG_URL = "https://raw.githubusercontent.com/DesperadoBoi/TGSpaces/main/catalog/clones.json";
     private static final String APP_CATALOG_URL = "https://raw.githubusercontent.com/DesperadoBoi/TGSpaces/main/catalog/app.json";
+    private static final int MAX_CLONE_APKS = 10;
 
     private SharedPreferences preferences;
     private View checkUpdatesRow;
     private TextView checkUpdatesLabel;
     private TextView themeValueText;
     private TextView appVersionText;
+    private TextView storageStatusText;
     private String themeMode = THEME_MODE_DARK;
 
     @Override
@@ -64,16 +82,19 @@ public class SettingsActivity extends AppCompatActivity {
         checkUpdatesLabel = findViewById(R.id.textCheckUpdatesLabel);
         themeValueText = findViewById(R.id.textThemeValue);
         appVersionText = findViewById(R.id.textAppVersion);
+        storageStatusText = findViewById(R.id.textStorageStatus);
 
         findViewById(R.id.buttonBack).setOnClickListener(view -> finish());
         findViewById(R.id.themeRow).setOnClickListener(this::showThemePicker);
         checkUpdatesRow.setOnClickListener(view -> checkUpdatesManually());
+        findViewById(R.id.buttonCleanupApks).setOnClickListener(view -> confirmCleanupDownloads());
         findViewById(R.id.buttonWhatIsSlot).setOnClickListener(view -> showWhatIsSlotDialog());
         findViewById(R.id.buttonHowInstall).setOnClickListener(view -> showInstallHelpDialog());
         findViewById(R.id.buttonAbout).setOnClickListener(view -> showAboutDialog());
 
         updateThemeValueText();
         updateVersionText();
+        updateStorageStatusText();
     }
 
     private void setupSettingsInsets() {
@@ -109,15 +130,17 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void showThemePicker(View anchor) {
+        final int systemId = 1;
+        final int lightId = 2;
+        final int darkId = 3;
         PopupMenu menu = new PopupMenu(this, anchor);
-        menu.getMenu().add("Системная");
-        menu.getMenu().add("Светлая");
-        menu.getMenu().add("Тёмная");
+        menu.getMenu().add(0, systemId, 0, "Системная");
+        menu.getMenu().add(0, lightId, 1, "Светлая");
+        menu.getMenu().add(0, darkId, 2, "Тёмная");
         menu.setOnMenuItemClickListener(item -> {
-            String title = item.getTitle().toString();
-            if ("Светлая".equals(title)) {
+            if (item.getItemId() == lightId) {
                 setThemeMode(THEME_MODE_LIGHT);
-            } else if ("Тёмная".equals(title)) {
+            } else if (item.getItemId() == darkId) {
                 setThemeMode(THEME_MODE_DARK);
             } else {
                 setThemeMode(THEME_MODE_SYSTEM);
@@ -137,6 +160,7 @@ public class SettingsActivity extends AppCompatActivity {
         }
     }
 
+
     private void updateVersionText() {
         try {
             PackageInfo packageInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
@@ -147,6 +171,199 @@ public class SettingsActivity extends AppCompatActivity {
             appVersionText.setText(versionName + " (" + versionCode + ")");
         } catch (PackageManager.NameNotFoundException e) {
             appVersionText.setText("неизвестно");
+        }
+    }
+
+    private void updateStorageStatusText() {
+        if (storageStatusText == null) {
+            return;
+        }
+        storageStatusText.setText(hasDownloadedApks()
+                ? "Скачанные APK: есть. Установленные клоны не удаляются."
+                : "Скачанные APK: нет. Установленные клоны не удаляются.");
+    }
+
+    private void confirmCleanupDownloads() {
+        new AlertDialog.Builder(this)
+                .setTitle("Очистить скачанные APK?")
+                .setMessage("Установленные клоны не будут удалены. Будут удалены только APK-файлы, скачанные TGSpaces.")
+                .setPositiveButton("Очистить", (dialog, which) -> cleanupDownloadedApks())
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void cleanupDownloadedApks() {
+        Log.d(TAG, "cleanup downloads started");
+        CleanupResult result = new CleanupResult();
+        DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+        SharedPreferences.Editor editor = preferences.edit();
+
+        for (int slot = 1; slot <= MAX_CLONE_APKS; slot++) {
+            long slotDownloadId = preferences.getLong(slotDownloadKey(slot), -1L);
+            if (slotDownloadId > 0) {
+                removeDownload(manager, slotDownloadId, result);
+                editor.remove(slotDownloadKey(slot));
+                editor.remove(downloadSlotKey(slotDownloadId));
+            }
+            editor.remove(slotErrorKey(slot));
+            editor.remove(slotAutoOpenedKey(slot));
+        }
+
+        long pendingDownloadId = preferences.getLong(KEY_PENDING_DOWNLOAD_ID, -1L);
+        if (pendingDownloadId > 0) {
+            removeDownload(manager, pendingDownloadId, result);
+            editor.remove(downloadSlotKey(pendingDownloadId));
+        }
+        deleteKnownApkPath(preferences.getString(KEY_PENDING_APK, null), result);
+        editor.remove(KEY_PENDING_APK)
+                .remove(KEY_PENDING_SLOT)
+                .remove(KEY_PENDING_DOWNLOAD_ID);
+
+        long appUpdateDownloadId = preferences.getLong(KEY_APP_UPDATE_DOWNLOAD_ID, -1L);
+        if (appUpdateDownloadId > 0) {
+            removeDownload(manager, appUpdateDownloadId, result);
+        }
+        deleteKnownApkPath(preferences.getString(KEY_APP_UPDATE_APK_PATH, null), result);
+        editor.remove(KEY_APP_UPDATE_DOWNLOAD_ID)
+                .remove(KEY_APP_UPDATE_APK_PATH)
+                .remove(KEY_APP_UPDATE_DOWNLOAD_FAILED);
+
+        deleteApksInAppDownloads(result);
+        editor.apply();
+        updateStorageStatusText();
+
+        Log.d(TAG, "cleanup downloads finished: removed=" + result.removed);
+        Toast.makeText(this, result.removed ? "Скачанные APK очищены" : "Нечего очищать", Toast.LENGTH_SHORT).show();
+    }
+
+    private boolean hasDownloadedApks() {
+        if (preferences.getLong(KEY_PENDING_DOWNLOAD_ID, -1L) > 0
+                || preferences.getLong(KEY_APP_UPDATE_DOWNLOAD_ID, -1L) > 0) {
+            return true;
+        }
+        if (isSafeApkFile(preferences.getString(KEY_PENDING_APK, null))
+                || isSafeApkFile(preferences.getString(KEY_APP_UPDATE_APK_PATH, null))) {
+            return true;
+        }
+        for (int slot = 1; slot <= MAX_CLONE_APKS; slot++) {
+            if (preferences.getLong(slotDownloadKey(slot), -1L) > 0) {
+                return true;
+            }
+        }
+        File downloadsDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+        File[] files = downloadsDir != null ? downloadsDir.listFiles() : null;
+        if (files == null) {
+            return false;
+        }
+        for (File file : files) {
+            if (file.isFile() && file.getName().toLowerCase().endsWith(".apk")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void removeDownload(DownloadManager manager, long downloadId, CleanupResult result) {
+        String localUri = queryDownloadLocalUri(downloadId);
+        try {
+            int removed = manager.remove(downloadId);
+            if (removed > 0) {
+                result.removed = true;
+                Log.d(TAG, "cleanup download removed: downloadId=" + downloadId);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "cleanup download remove failed: downloadId=" + downloadId, e);
+        }
+        deleteKnownApkUri(localUri, result);
+    }
+
+    private String queryDownloadLocalUri(long downloadId) {
+        DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+        DownloadManager.Query query = new DownloadManager.Query().setFilterById(downloadId);
+        try (Cursor cursor = manager.query(query)) {
+            if (cursor == null || !cursor.moveToFirst()) {
+                return null;
+            }
+            int column = cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI);
+            return column >= 0 ? cursor.getString(column) : null;
+        } catch (Exception e) {
+            Log.w(TAG, "cleanup download query failed: downloadId=" + downloadId, e);
+            return null;
+        }
+    }
+
+    private void deleteKnownApkUri(String uriText, CleanupResult result) {
+        if (uriText == null || uriText.trim().isEmpty()) {
+            return;
+        }
+        Uri uri = Uri.parse(uriText);
+        if ("file".equals(uri.getScheme())) {
+            deleteKnownApkPath(uri.getPath(), result);
+        } else if ("content".equals(uri.getScheme())) {
+            try {
+                int deleted = getContentResolver().delete(uri, null, null);
+                if (deleted > 0) {
+                    result.removed = true;
+                    Log.d(TAG, "cleanup file deleted: uri=" + uri);
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "cleanup content uri delete failed: uri=" + uri, e);
+            }
+        }
+    }
+
+    private void deleteKnownApkPath(String path, CleanupResult result) {
+        if (path == null || path.trim().isEmpty()) {
+            return;
+        }
+        File file = new File(path);
+        if (!isSafeApkFile(file)) {
+            return;
+        }
+        if (!file.exists()) {
+            Log.d(TAG, "cleanup skipped missing file: path=" + file.getAbsolutePath());
+            return;
+        }
+        if (file.delete()) {
+            result.removed = true;
+            Log.d(TAG, "cleanup file deleted: path=" + file.getAbsolutePath());
+        } else {
+            Log.w(TAG, "cleanup file delete failed: path=" + file.getAbsolutePath());
+        }
+    }
+
+    private void deleteApksInAppDownloads(CleanupResult result) {
+        File downloadsDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+        File[] files = downloadsDir != null ? downloadsDir.listFiles() : null;
+        if (files == null) {
+            return;
+        }
+        for (File file : files) {
+            if (isSafeApkFile(file)) {
+                deleteKnownApkPath(file.getAbsolutePath(), result);
+            }
+        }
+    }
+
+    private boolean isSafeApkFile(String path) {
+        return path != null && isSafeApkFile(new File(path));
+    }
+
+    private boolean isSafeApkFile(File file) {
+        if (file == null || !file.getName().toLowerCase().endsWith(".apk")) {
+            return false;
+        }
+        File downloadsDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+        if (downloadsDir == null) {
+            return false;
+        }
+        try {
+            String filePath = file.getCanonicalPath();
+            String downloadsPath = downloadsDir.getCanonicalPath();
+            return filePath.equals(downloadsPath) || filePath.startsWith(downloadsPath + File.separator);
+        } catch (Exception e) {
+            Log.w(TAG, "cleanup safe path check failed: path=" + file.getAbsolutePath(), e);
+            return false;
         }
     }
 
@@ -287,5 +504,25 @@ public class SettingsActivity extends AppCompatActivity {
                 .setMessage("Версия: " + versionText + "\n\nНеофициальное приложение. Проект не связан с Telegram.")
                 .setPositiveButton("OK", null)
                 .show();
+    }
+
+    private static String slotDownloadKey(int slot) {
+        return KEY_SLOT_DOWNLOAD_PREFIX + slot;
+    }
+
+    private static String downloadSlotKey(long downloadId) {
+        return KEY_DOWNLOAD_SLOT_PREFIX + downloadId;
+    }
+
+    private static String slotErrorKey(int slot) {
+        return KEY_SLOT_ERROR_PREFIX + slot;
+    }
+
+    private static String slotAutoOpenedKey(int slot) {
+        return KEY_SLOT_AUTO_OPENED_PREFIX + slot;
+    }
+
+    private static class CleanupResult {
+        boolean removed;
     }
 }
