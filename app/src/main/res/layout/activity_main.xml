@@ -136,6 +136,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
+            android:clipToPadding="false"
             android:overScrollMode="never"
             android:scrollbars="none">
 
@@ -145,55 +146,76 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
 
-                <Button
+                <TextView
                     android:id="@+id/filterAll"
                     android:layout_width="wrap_content"
                     android:layout_height="32dp"
                     android:layout_marginEnd="6dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
                     android:minWidth="0dp"
-                    android:minHeight="32dp"
+                    android:minHeight="0dp"
                     android:paddingStart="12dp"
                     android:paddingEnd="12dp"
+                    android:paddingTop="0dp"
+                    android:paddingBottom="0dp"
                     android:text="Все"
-                    android:textAllCaps="false"
                     android:textSize="12sp" />
 
-                <Button
+                <TextView
                     android:id="@+id/filterInstalled"
                     android:layout_width="wrap_content"
                     android:layout_height="32dp"
                     android:layout_marginEnd="6dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
                     android:minWidth="0dp"
-                    android:minHeight="32dp"
+                    android:minHeight="0dp"
                     android:paddingStart="12dp"
                     android:paddingEnd="12dp"
+                    android:paddingTop="0dp"
+                    android:paddingBottom="0dp"
                     android:text="Установленные"
-                    android:textAllCaps="false"
                     android:textSize="12sp" />
 
-                <Button
+                <TextView
                     android:id="@+id/filterFree"
                     android:layout_width="wrap_content"
                     android:layout_height="32dp"
                     android:layout_marginEnd="6dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
                     android:minWidth="0dp"
-                    android:minHeight="32dp"
+                    android:minHeight="0dp"
                     android:paddingStart="12dp"
                     android:paddingEnd="12dp"
+                    android:paddingTop="0dp"
+                    android:paddingBottom="0dp"
                     android:text="Свободные"
-                    android:textAllCaps="false"
                     android:textSize="12sp" />
 
-                <Button
+                <TextView
                     android:id="@+id/filterUpdates"
                     android:layout_width="wrap_content"
                     android:layout_height="32dp"
+                    android:layout_marginEnd="@dimen/screen_padding"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
                     android:minWidth="0dp"
-                    android:minHeight="32dp"
+                    android:minHeight="0dp"
                     android:paddingStart="12dp"
                     android:paddingEnd="12dp"
+                    android:paddingTop="0dp"
+                    android:paddingBottom="0dp"
                     android:text="Обновления"
-                    android:textAllCaps="false"
                     android:textSize="12sp" />
             </LinearLayout>
         </HorizontalScrollView>

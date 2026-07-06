@@ -96,10 +96,10 @@ public class MainActivity extends AppCompatActivity {
     private LinearLayout slotEmptyState;
     private Button displayModeToggleButton;
     private EditText slotSearchInput;
-    private Button filterAllButton;
-    private Button filterInstalledButton;
-    private Button filterFreeButton;
-    private Button filterUpdatesButton;
+    private TextView filterAllButton;
+    private TextView filterInstalledButton;
+    private TextView filterFreeButton;
+    private TextView filterUpdatesButton;
     private int visibleSlotCount = 1;
     private boolean slotVisibilityLogged;
     private boolean compactDisplayMode;
@@ -287,7 +287,7 @@ public class MainActivity extends AppCompatActivity {
         styleSlotFilterChip(filterUpdatesButton, activeSlotFilter == SlotFilter.UPDATES);
     }
 
-    private void styleSlotFilterChip(Button button, boolean active) {
+    private void styleSlotFilterChip(TextView button, boolean active) {
         button.setTextColor(ContextCompat.getColor(this, active ? R.color.button_primary_text : R.color.button_secondary_text));
         button.setBackgroundResource(active ? R.drawable.button_segment_active_background : R.drawable.button_secondary_background);
         button.setTypeface(Typeface.DEFAULT, active ? Typeface.BOLD : Typeface.NORMAL);
