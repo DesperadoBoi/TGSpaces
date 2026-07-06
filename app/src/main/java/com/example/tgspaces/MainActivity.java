@@ -19,11 +19,14 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.content.res.Configuration;
 import android.text.Editable;
+import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.GridLayout;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.TextView;
@@ -70,6 +73,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String KEY_SLOT_HIDDEN_PREFIX = "slot_hidden_";
     private static final String KEY_FIRST_LAUNCH_HELP_SHOWN = "first_launch_help_shown";
     private static final String KEY_DISPLAY_MODE_COMPACT = "display_mode_compact";
+    private static final String KEY_DISPLAY_MODE = "display_mode";
     private static final String KEY_THEME_MODE = "theme_mode";
     private static final String THEME_MODE_SYSTEM = "system";
     private static final String THEME_MODE_LIGHT = "light";
@@ -94,7 +98,9 @@ public class MainActivity extends AppCompatActivity {
     private Button appUpdateButton;
     private LinearLayout slotsContainer;
     private LinearLayout slotEmptyState;
-    private Button displayModeToggleButton;
+    private TextView displayModeCardsButton;
+    private TextView displayModeCompactButton;
+    private TextView displayModeGridButton;
     private EditText slotSearchInput;
     private TextView filterAllButton;
     private TextView filterInstalledButton;
@@ -102,7 +108,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView filterUpdatesButton;
     private int visibleSlotCount = 1;
     private boolean slotVisibilityLogged;
-    private boolean compactDisplayMode;
+    private DisplayMode displayMode = DisplayMode.CARDS;
     private String slotSearchQuery = "";
     private SlotFilter activeSlotFilter = SlotFilter.ALL;
     private String themeMode = THEME_MODE_DARK;
@@ -160,22 +166,26 @@ public class MainActivity extends AppCompatActivity {
         appUpdateButton = findViewById(R.id.buttonDownloadAppUpdate);
         slotsContainer = findViewById(R.id.slotsContainer);
         slotEmptyState = findViewById(R.id.slotEmptyState);
-        displayModeToggleButton = findViewById(R.id.buttonDisplayModeToggle);
+        displayModeCardsButton = findViewById(R.id.modeCards);
+        displayModeCompactButton = findViewById(R.id.modeCompact);
+        displayModeGridButton = findViewById(R.id.modeGrid);
         slotSearchInput = findViewById(R.id.inputSlotSearch);
         filterAllButton = findViewById(R.id.filterAll);
         filterInstalledButton = findViewById(R.id.filterInstalled);
         filterFreeButton = findViewById(R.id.filterFree);
         filterUpdatesButton = findViewById(R.id.filterUpdates);
-        compactDisplayMode = preferences.getBoolean(KEY_DISPLAY_MODE_COMPACT, false);
+        displayMode = loadDisplayMode();
         themeMode = preferences.getString(KEY_THEME_MODE, THEME_MODE_DARK);
-        Log.d(TAG, "display mode loaded: " + (compactDisplayMode ? "compact" : "cards"));
+        Log.d(TAG, "display mode loaded: " + displayMode.preferenceValue);
 
         findViewById(R.id.buttonAddSlot).setOnClickListener(view -> addSlot());
-        displayModeToggleButton.setOnClickListener(view -> setDisplayMode(!compactDisplayMode));
+        displayModeCardsButton.setOnClickListener(view -> setDisplayMode(DisplayMode.CARDS));
+        displayModeCompactButton.setOnClickListener(view -> setDisplayMode(DisplayMode.COMPACT));
+        displayModeGridButton.setOnClickListener(view -> setDisplayMode(DisplayMode.GRID));
         findViewById(R.id.buttonSettings).setOnClickListener(view -> openSettings());
         findViewById(R.id.buttonThemeToggle).setOnClickListener(view -> toggleLightDarkTheme());
         appUpdateButton.setOnClickListener(view -> downloadAppUpdate());
-        updateDisplayModeToggleText();
+        updateDisplayModeControls();
         updateThemeToggleButton();
         setupSlotSearchAndFilters();
 
@@ -200,10 +210,10 @@ public class MainActivity extends AppCompatActivity {
             recreate();
             return;
         }
-        boolean newCompactMode = preferences.getBoolean(KEY_DISPLAY_MODE_COMPACT, false);
-        if (compactDisplayMode != newCompactMode) {
-            compactDisplayMode = newCompactMode;
-            updateDisplayModeToggleText();
+        DisplayMode newDisplayMode = loadDisplayMode();
+        if (displayMode != newDisplayMode) {
+            displayMode = newDisplayMode;
+            updateDisplayModeControls();
         }
         if (preferences.getBoolean(KEY_SETTINGS_CATALOG_REFRESHED, false)) {
             preferences.edit().remove(KEY_SETTINGS_CATALOG_REFRESHED).apply();
@@ -231,6 +241,18 @@ public class MainActivity extends AppCompatActivity {
         logSlotVisibilityStateOnce();
 
         slotsContainer.removeAllViews();
+        GridLayout grid = null;
+        if (displayMode == DisplayMode.GRID) {
+            grid = new GridLayout(this);
+            grid.setColumnCount(gridColumnCount());
+            grid.setUseDefaultMargins(false);
+            grid.setAlignmentMode(GridLayout.ALIGN_BOUNDS);
+            grid.setLayoutParams(new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+            ));
+            slotsContainer.addView(grid);
+        }
         int renderedSlots = 0;
         for (int slot = 1; slot <= visibleSlotCount; slot++) {
             if (isSlotHidden(slot) && !isAppInstalled(packageName(slot))) {
@@ -240,14 +262,35 @@ public class MainActivity extends AppCompatActivity {
             if (!matchesSlotFilters(slot, state)) {
                 continue;
             }
-            slotsContainer.addView(compactDisplayMode ? renderCompactSlot(slot) : renderCardSlot(slot));
+            if (displayMode == DisplayMode.GRID) {
+                grid.addView(renderGridSlot(slot));
+            } else {
+                slotsContainer.addView(displayMode == DisplayMode.COMPACT ? renderCompactSlot(slot) : renderCardSlot(slot));
+            }
             renderedSlots++;
         }
         slotEmptyState.setVisibility(renderedSlots == 0 ? View.VISIBLE : View.GONE);
         scheduleProgressRefreshIfNeeded();
     }
 
+    private int gridColumnCount() {
+        int widthDp = getResources().getConfiguration().screenWidthDp;
+        if (widthDp >= 840) {
+            return 4;
+        }
+        if (widthDp >= 600) {
+            return 3;
+        }
+        return 2;
+    }
+
     private void setupSlotSearchAndFilters() {
+        slotSearchInput.setHint("Поиск по слоту");
+        filterAllButton.setText("Все");
+        filterInstalledButton.setText("Установлены");
+        filterFreeButton.setText("Свободные");
+        filterUpdatesButton.setText("Обновления");
+
         slotSearchInput.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence text, int start, int count, int after) {
@@ -289,8 +332,10 @@ public class MainActivity extends AppCompatActivity {
 
     private void styleSlotFilterChip(TextView button, boolean active) {
         button.setTextColor(ContextCompat.getColor(this, active ? R.color.button_primary_text : R.color.button_secondary_text));
-        button.setBackgroundResource(active ? R.drawable.button_segment_active_background : R.drawable.button_secondary_background);
+        button.setBackgroundResource(active ? R.drawable.button_segment_active_background : R.drawable.button_segment_inactive_background);
         button.setTypeface(Typeface.DEFAULT, active ? Typeface.BOLD : Typeface.NORMAL);
+        button.setSingleLine(true);
+        button.setIncludeFontPadding(false);
     }
 
     private boolean matchesSlotFilters(int slot, SlotState state) {
@@ -331,23 +376,44 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void setDisplayMode(boolean compact) {
-        if (compactDisplayMode == compact) {
+    private DisplayMode loadDisplayMode() {
+        String savedMode = preferences.getString(KEY_DISPLAY_MODE, null);
+        if (savedMode != null) {
+            return DisplayMode.fromPreferenceValue(savedMode);
+        }
+        return preferences.getBoolean(KEY_DISPLAY_MODE_COMPACT, false) ? DisplayMode.COMPACT : DisplayMode.CARDS;
+    }
+
+    private void setDisplayMode(DisplayMode mode) {
+        if (displayMode == mode) {
             return;
         }
-        compactDisplayMode = compact;
-        preferences.edit().putBoolean(KEY_DISPLAY_MODE_COMPACT, compactDisplayMode).apply();
-        Log.d(TAG, "display mode changed: " + (compactDisplayMode ? "compact" : "cards"));
-        updateDisplayModeToggleText();
+        displayMode = mode;
+        preferences.edit()
+                .putString(KEY_DISPLAY_MODE, displayMode.preferenceValue)
+                .putBoolean(KEY_DISPLAY_MODE_COMPACT, displayMode == DisplayMode.COMPACT)
+                .apply();
+        Log.d(TAG, "display mode changed: " + displayMode.preferenceValue);
+        updateDisplayModeControls();
         renderSlots();
     }
 
-    private void updateDisplayModeToggleText() {
-        if (displayModeToggleButton == null) {
+    private void updateDisplayModeControls() {
+        if (displayModeCardsButton == null || displayModeCompactButton == null || displayModeGridButton == null) {
             return;
         }
 
-        displayModeToggleButton.setText(compactDisplayMode ? "Карточки" : "Компактно");
+        styleDisplayModeButton(displayModeCardsButton, displayMode == DisplayMode.CARDS);
+        styleDisplayModeButton(displayModeCompactButton, displayMode == DisplayMode.COMPACT);
+        styleDisplayModeButton(displayModeGridButton, displayMode == DisplayMode.GRID);
+    }
+
+    private void styleDisplayModeButton(TextView button, boolean active) {
+        button.setTextColor(ContextCompat.getColor(this, active ? R.color.button_primary_text : R.color.button_secondary_text));
+        button.setBackgroundResource(active ? R.drawable.button_segment_active_background : R.drawable.button_segment_inactive_background);
+        button.setTypeface(Typeface.DEFAULT, active ? Typeface.BOLD : Typeface.NORMAL);
+        button.setSingleLine(true);
+        button.setIncludeFontPadding(false);
     }
 
     private void openSettings() {
@@ -410,7 +476,7 @@ public class MainActivity extends AppCompatActivity {
     private View renderCardSlot(int slot) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(12), dp(9), dp(12), dp(9));
+        card.setPadding(dp(12), dp(11), dp(12), dp(12));
 
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -426,12 +492,32 @@ public class MainActivity extends AppCompatActivity {
                         : R.drawable.slot_card_background
         );
 
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        ));
+
+        LinearLayout textColumn = new LinearLayout(this);
+        textColumn.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1
+        );
+        textParams.setMargins(0, 0, dp(10), 0);
+        textColumn.setLayoutParams(textParams);
+
         TextView title = new TextView(this);
         title.setText(slotName(slot));
         title.setTextColor(ContextCompat.getColor(this, R.color.text_primary));
-        title.setTextSize(19);
+        title.setTextSize(18);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        card.addView(title);
+        title.setSingleLine(true);
+        title.setEllipsize(TextUtils.TruncateAt.END);
+        textColumn.addView(title);
 
         TextView status = new TextView(this);
         LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(
@@ -443,7 +529,17 @@ public class MainActivity extends AppCompatActivity {
         status.setText(compactStatusText(slot, state));
         status.setTextColor(ContextCompat.getColor(this, statusColor(state)));
         status.setTextSize(14);
-        card.addView(status);
+        status.setSingleLine(true);
+        status.setEllipsize(TextUtils.TruncateAt.END);
+        textColumn.addView(status);
+
+        header.addView(textColumn);
+
+        Button menuButton = createMenuButton(false, view -> showSlotMenu(view, slot, state.type));
+        LinearLayout.LayoutParams menuParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+        menuButton.setLayoutParams(menuParams);
+        header.addView(menuButton);
+        card.addView(header);
 
         if (state.hintText != null
                 && state.type != SlotStateType.INSTALLED
@@ -462,7 +558,7 @@ public class MainActivity extends AppCompatActivity {
             card.addView(hint);
         }
 
-        addSlotPrimaryAction(card, slot, state, false);
+        addSingleAction(card, createPrimarySlotActionButton(slot, state, false), false);
         return card;
     }
 
@@ -500,6 +596,8 @@ public class MainActivity extends AppCompatActivity {
         title.setTextColor(ContextCompat.getColor(this, R.color.text_primary));
         title.setTextSize(15);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        title.setSingleLine(true);
+        title.setEllipsize(TextUtils.TruncateAt.END);
         textColumn.addView(title);
 
         TextView status = new TextView(this);
@@ -512,6 +610,8 @@ public class MainActivity extends AppCompatActivity {
         status.setText(compactStatusText(slot, state));
         status.setTextColor(ContextCompat.getColor(this, statusColor(state)));
         status.setTextSize(12);
+        status.setSingleLine(true);
+        status.setEllipsize(TextUtils.TruncateAt.END);
         textColumn.addView(status);
 
         row.addView(textColumn);
@@ -519,7 +619,188 @@ public class MainActivity extends AppCompatActivity {
         return row;
     }
 
+    private View renderGridSlot(int slot) {
+        SlotState state = getSlotState(slot);
+
+        LinearLayout tile = new LinearLayout(this);
+        tile.setOrientation(LinearLayout.VERTICAL);
+        tile.setGravity(Gravity.CENTER_HORIZONTAL);
+        tile.setPadding(dp(6), dp(7), dp(6), dp(8));
+        tile.setBackgroundResource(
+                state.type == SlotStateType.UPDATE_AVAILABLE
+                        ? R.drawable.slot_grid_update_background
+                        : R.drawable.slot_grid_background
+        );
+        tile.setClickable(true);
+        tile.setFocusable(true);
+        tile.setOnClickListener(view -> handleGridSlotClick(slot, state.type));
+        tile.setOnLongClickListener(view -> {
+            showSlotMenu(view, slot, state.type);
+            return true;
+        });
+
+        GridLayout.LayoutParams tileParams = new GridLayout.LayoutParams();
+        tileParams.width = 0;
+        tileParams.height = GridLayout.LayoutParams.WRAP_CONTENT;
+        tileParams.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f);
+        tileParams.setMargins(dp(3), dp(3), dp(3), dp(7));
+        tile.setLayoutParams(tileParams);
+
+        LinearLayout topRow = new LinearLayout(this);
+        topRow.setOrientation(LinearLayout.HORIZONTAL);
+        topRow.setGravity(Gravity.CENTER_VERTICAL);
+        topRow.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        ));
+
+        TextView icon = new TextView(this);
+        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+        iconParams.setMargins(0, 0, dp(4), 0);
+        icon.setLayoutParams(iconParams);
+        icon.setGravity(Gravity.CENTER);
+        icon.setBackgroundResource(R.drawable.slot_grid_icon_background);
+        icon.setText(String.format(Locale.US, "%02d", slot));
+        icon.setTextColor(ContextCompat.getColor(this, R.color.text_primary));
+        icon.setTextSize(15);
+        icon.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        topRow.addView(icon);
+
+        View spacer = new View(this);
+        spacer.setLayoutParams(new LinearLayout.LayoutParams(0, 1, 1));
+        topRow.addView(spacer);
+
+        Button menuButton = createMenuButton(true, view -> showSlotMenu(view, slot, state.type));
+        LinearLayout.LayoutParams menuParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+        menuButton.setLayoutParams(menuParams);
+        topRow.addView(menuButton);
+        tile.addView(topRow);
+
+        TextView title = new TextView(this);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        titleParams.topMargin = dp(7);
+        title.setLayoutParams(titleParams);
+        title.setGravity(Gravity.CENTER);
+        title.setSingleLine(true);
+        title.setEllipsize(TextUtils.TruncateAt.END);
+        title.setText(slotName(slot));
+        title.setTextColor(ContextCompat.getColor(this, R.color.text_primary));
+        title.setTextSize(12);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        tile.addView(title);
+
+        TextView status = new TextView(this);
+        LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        statusParams.topMargin = dp(3);
+        status.setLayoutParams(statusParams);
+        status.setGravity(Gravity.CENTER);
+        status.setSingleLine(true);
+        status.setEllipsize(TextUtils.TruncateAt.END);
+        status.setText(gridStatusText(state));
+        status.setTextColor(ContextCompat.getColor(this, statusColor(state)));
+        status.setTextSize(10);
+        tile.addView(status);
+
+        if (state.type == SlotStateType.UPDATE_AVAILABLE) {
+            TextView badge = new TextView(this);
+            LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    dp(24)
+            );
+            badgeParams.topMargin = dp(6);
+            badge.setLayoutParams(badgeParams);
+            badge.setGravity(Gravity.CENTER);
+            badge.setIncludeFontPadding(false);
+            badge.setSingleLine(true);
+            badge.setPadding(dp(8), 0, dp(8), 0);
+            badge.setText("Обновить");
+            badge.setTextColor(ContextCompat.getColor(this, R.color.button_primary_text));
+            badge.setTextSize(10);
+            badge.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            badge.setBackgroundResource(R.drawable.slot_update_badge_background);
+            tile.addView(badge);
+        }
+
+        return tile;
+    }
+
+    private void handleGridSlotClick(int slot, SlotStateType stateType) {
+        switch (stateType) {
+            case INSTALLED:
+                openSlot(slot);
+                break;
+            case UPDATE_AVAILABLE:
+                downloadCloneApk(slot);
+                break;
+            case NOT_INSTALLED:
+                showInstallDialog(slot);
+                break;
+            case WAITING_INSTALL:
+                openInstallerForDownloadedApk(slot, getKnownDownloadId(slot));
+                break;
+            case DOWNLOAD_ERROR:
+                retryCloneDownload(slot);
+                break;
+            case DOWNLOADING:
+            default:
+                Toast.makeText(this, "Загрузка уже идет", Toast.LENGTH_SHORT).show();
+                break;
+        }
+    }
+
+    private String gridStatusText(SlotState state) {
+        switch (state.type) {
+            case UPDATE_AVAILABLE:
+                return "Доступно обновление";
+            case INSTALLED:
+                return "Установлено";
+            case DOWNLOADING:
+                return "Скачивается";
+            case WAITING_INSTALL:
+                return "Не установлен";
+            case DOWNLOAD_ERROR:
+                return "Ошибка";
+            case NOT_INSTALLED:
+            default:
+                return "Не установлен";
+        }
+    }
+
+    private Button createPrimarySlotActionButton(int slot, SlotState state, boolean compact) {
+        switch (state.type) {
+            case UPDATE_AVAILABLE:
+                return createButton("Обновить", true, true, compact, view -> downloadCloneApk(slot));
+            case INSTALLED:
+                return createButton("Открыть", true, true, compact, view -> openSlot(slot));
+            case DOWNLOADING:
+                return createButton("Отменить", true, true, compact, view -> cancelCloneDownload(slot));
+            case WAITING_INSTALL:
+                return createButton("Установить", true, true, compact, view -> openInstallerForDownloadedApk(slot, getKnownDownloadId(slot)));
+            case DOWNLOAD_ERROR:
+                return createButton("Повторить", true, true, compact, view -> retryCloneDownload(slot));
+            case NOT_INSTALLED:
+            default:
+                return createButton("Установить", true, true, compact, view -> showInstallDialog(slot));
+        }
+    }
+
     private void addSlotPrimaryAction(LinearLayout card, int slot, SlotState state, boolean compact) {
+        if (state != null) {
+            addActionRow(
+                    card,
+                    createPrimarySlotActionButton(slot, state, compact),
+                    createMenuButton(compact, view -> showSlotMenu(view, slot, state.type)),
+                    compact
+            );
+            return;
+        }
+
         switch (state.type) {
             case UPDATE_AVAILABLE:
                 addActionRow(card,
@@ -617,6 +898,7 @@ public class MainActivity extends AppCompatActivity {
     private void addActionRow(LinearLayout card, Button primaryButton, Button menuButton, boolean compact) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
                 compact ? LinearLayout.LayoutParams.WRAP_CONTENT : LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -633,8 +915,8 @@ public class MainActivity extends AppCompatActivity {
         primaryButton.setLayoutParams(primaryParams);
 
         LinearLayout.LayoutParams menuParams = new LinearLayout.LayoutParams(
-                dp(compact ? 34 : 40),
-                LinearLayout.LayoutParams.WRAP_CONTENT
+                dp(48),
+                dp(48)
         );
         menuButton.setLayoutParams(menuParams);
 
@@ -669,9 +951,9 @@ public class MainActivity extends AppCompatActivity {
         button.setAllCaps(false);
         button.setEnabled(enabled);
         button.setTypeface(Typeface.DEFAULT, primary ? Typeface.BOLD : Typeface.NORMAL);
-        button.setMinHeight(dp(compact ? 30 : 40));
-        button.setMinimumHeight(dp(compact ? 30 : 40));
-        button.setPadding(dp(compact ? 10 : 14), 0, dp(compact ? 10 : 14), 0);
+        button.setMinHeight(dp(compact ? 40 : 44));
+        button.setMinimumHeight(dp(compact ? 40 : 44));
+        button.setPadding(dp(compact ? 12 : 14), 0, dp(compact ? 12 : 14), 0);
         button.setTextSize(compact ? 12 : 13);
         button.setTextColor(ContextCompat.getColor(this, primary ? R.color.slot_action_text : R.color.button_secondary_text));
         button.setBackgroundResource(primary ? R.drawable.button_slot_action_background : R.drawable.button_secondary_background);
@@ -687,10 +969,12 @@ public class MainActivity extends AppCompatActivity {
         button.setAllCaps(false);
         button.setEnabled(true);
         button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        button.setMinHeight(dp(compact ? 30 : 40));
-        button.setMinimumHeight(dp(compact ? 30 : 40));
+        button.setMinWidth(dp(48));
+        button.setMinimumWidth(dp(48));
+        button.setMinHeight(dp(48));
+        button.setMinimumHeight(dp(48));
         button.setPadding(0, 0, 0, 0);
-        button.setTextSize(compact ? 16 : 18);
+        button.setTextSize(20);
         button.setTextColor(ContextCompat.getColor(this, R.color.button_secondary_text));
         button.setBackgroundResource(R.drawable.button_overflow_background);
         button.setOnClickListener(listener);
@@ -724,6 +1008,8 @@ public class MainActivity extends AppCompatActivity {
                 menu.getMenu().add("Скрыть слот");
                 break;
             case DOWNLOADING:
+                menu.getMenu().add("Отменить загрузку");
+                break;
             default:
                 return;
         }
@@ -742,6 +1028,8 @@ public class MainActivity extends AppCompatActivity {
                 restartCloneDownload(slot);
             } else if ("Скрыть слот".equals(title)) {
                 hideSlot(slot);
+            } else if ("Отменить загрузку".equals(title)) {
+                cancelCloneDownload(slot);
             }
             return true;
         });
@@ -2058,6 +2346,41 @@ public class MainActivity extends AppCompatActivity {
         INSTALLED,
         FREE,
         UPDATES
+    }
+
+    private enum DisplayMode {
+        CARDS("cards", "Компактно"),
+        COMPACT("compact", "Сетка"),
+        GRID("grid", "Карточки");
+
+        final String preferenceValue;
+        final String buttonText;
+
+        DisplayMode(String preferenceValue, String buttonText) {
+            this.preferenceValue = preferenceValue;
+            this.buttonText = buttonText;
+        }
+
+        DisplayMode next() {
+            switch (this) {
+                case CARDS:
+                    return COMPACT;
+                case COMPACT:
+                    return GRID;
+                case GRID:
+                default:
+                    return CARDS;
+            }
+        }
+
+        static DisplayMode fromPreferenceValue(String value) {
+            for (DisplayMode mode : values()) {
+                if (mode.preferenceValue.equals(value)) {
+                    return mode;
+                }
+            }
+            return CARDS;
+        }
     }
 
     private static class SlotState {

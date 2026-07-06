@@ -32,12 +32,12 @@
 
             <Button
                 android:id="@+id/buttonThemeToggle"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
                 android:layout_marginEnd="8dp"
                 android:background="@drawable/button_overflow_background"
-                android:minWidth="36dp"
-                android:minHeight="36dp"
+                android:minWidth="44dp"
+                android:minHeight="44dp"
                 android:padding="0dp"
                 android:text="☾"
                 android:textAllCaps="false"
@@ -47,11 +47,11 @@
 
             <Button
                 android:id="@+id/buttonSettings"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
                 android:background="@drawable/button_overflow_background"
-                android:minWidth="36dp"
-                android:minHeight="36dp"
+                android:minWidth="44dp"
+                android:minHeight="44dp"
                 android:padding="0dp"
                 android:text="⚙"
                 android:textAllCaps="false"
@@ -91,46 +91,86 @@
             android:orientation="horizontal">
 
             <TextView
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:text="Слоты"
                 android:textColor="@color/text_primary"
                 android:textSize="16sp"
                 android:textStyle="bold" />
-
-            <Button
-                android:id="@+id/buttonDisplayModeToggle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@drawable/button_secondary_background"
-                android:minWidth="0dp"
-                android:minHeight="30dp"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:text="Компактно"
-                android:textAllCaps="false"
-                android:textColor="@color/button_secondary_text"
-                android:textSize="12sp" />
         </LinearLayout>
 
         <EditText
             android:id="@+id/inputSlotSearch"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="38dp"
             android:layout_marginBottom="8dp"
             android:background="@drawable/settings_row_background"
-            android:hint="Поиск слота"
+            android:hint="Поиск по слоту"
             android:imeOptions="actionSearch"
             android:inputType="text"
             android:maxLines="1"
-            android:minHeight="42dp"
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp"
+            android:minHeight="38dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
             android:singleLine="true"
             android:textColor="@color/text_primary"
             android:textColorHint="@color/text_secondary"
             android:textSize="14sp" />
+
+        <LinearLayout
+            android:id="@+id/displayModeSegments"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/segmented_background"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:padding="3dp">
+
+            <TextView
+                android:id="@+id/modeCards"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="3dp"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="0dp"
+                android:singleLine="true"
+                android:text="Карточки"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/modeCompact"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="3dp"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="0dp"
+                android:singleLine="true"
+                android:text="Компактно"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/modeGrid"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="0dp"
+                android:singleLine="true"
+                android:text="Сетка"
+                android:textSize="12sp" />
+        </LinearLayout>
 
         <HorizontalScrollView
             android:layout_width="match_parent"
@@ -149,7 +189,7 @@
                 <TextView
                     android:id="@+id/filterAll"
                     android:layout_width="wrap_content"
-                    android:layout_height="32dp"
+                    android:layout_height="36dp"
                     android:layout_marginEnd="6dp"
                     android:clickable="true"
                     android:focusable="true"
@@ -157,17 +197,18 @@
                     android:includeFontPadding="false"
                     android:minWidth="0dp"
                     android:minHeight="0dp"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="12dp"
+                    android:paddingStart="11dp"
+                    android:paddingEnd="11dp"
                     android:paddingTop="0dp"
                     android:paddingBottom="0dp"
                     android:text="Все"
+                    android:singleLine="true"
                     android:textSize="12sp" />
 
                 <TextView
                     android:id="@+id/filterInstalled"
                     android:layout_width="wrap_content"
-                    android:layout_height="32dp"
+                    android:layout_height="36dp"
                     android:layout_marginEnd="6dp"
                     android:clickable="true"
                     android:focusable="true"
@@ -175,17 +216,18 @@
                     android:includeFontPadding="false"
                     android:minWidth="0dp"
                     android:minHeight="0dp"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="12dp"
+                    android:paddingStart="11dp"
+                    android:paddingEnd="11dp"
                     android:paddingTop="0dp"
                     android:paddingBottom="0dp"
-                    android:text="Установленные"
+                    android:text="Установлены"
+                    android:singleLine="true"
                     android:textSize="12sp" />
 
                 <TextView
                     android:id="@+id/filterFree"
                     android:layout_width="wrap_content"
-                    android:layout_height="32dp"
+                    android:layout_height="36dp"
                     android:layout_marginEnd="6dp"
                     android:clickable="true"
                     android:focusable="true"
@@ -193,17 +235,18 @@
                     android:includeFontPadding="false"
                     android:minWidth="0dp"
                     android:minHeight="0dp"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="12dp"
+                    android:paddingStart="11dp"
+                    android:paddingEnd="11dp"
                     android:paddingTop="0dp"
                     android:paddingBottom="0dp"
                     android:text="Свободные"
+                    android:singleLine="true"
                     android:textSize="12sp" />
 
                 <TextView
                     android:id="@+id/filterUpdates"
                     android:layout_width="wrap_content"
-                    android:layout_height="32dp"
+                    android:layout_height="36dp"
                     android:layout_marginEnd="@dimen/screen_padding"
                     android:clickable="true"
                     android:focusable="true"
@@ -211,11 +254,12 @@
                     android:includeFontPadding="false"
                     android:minWidth="0dp"
                     android:minHeight="0dp"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="12dp"
+                    android:paddingStart="11dp"
+                    android:paddingEnd="11dp"
                     android:paddingTop="0dp"
                     android:paddingBottom="0dp"
                     android:text="Обновления"
+                    android:singleLine="true"
                     android:textSize="12sp" />
             </LinearLayout>
         </HorizontalScrollView>

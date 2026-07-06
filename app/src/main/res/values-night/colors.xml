@@ -13,6 +13,7 @@
     <color name="button_primary">#3B82F6</color>
     <color name="button_primary_text">#FFFFFFFF</color>
     <color name="button_secondary">#18243A</color>
+    <color name="button_secondary_pressed">#223451</color>
     <color name="button_secondary_text">#D9E3F0</color>
     <color name="slot_action_bg">#1B355C</color>
     <color name="slot_action_text">#B5D0FF</color>
