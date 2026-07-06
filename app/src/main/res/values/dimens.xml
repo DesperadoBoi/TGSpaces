@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <dimen name="screen_padding">18dp</dimen>
-    <dimen name="section_gap">14dp</dimen>
-    <dimen name="card_padding">14dp</dimen>
+    <dimen name="screen_padding">16dp</dimen>
+    <dimen name="section_gap">10dp</dimen>
+    <dimen name="card_padding">11dp</dimen>
     <dimen name="button_gap">8dp</dimen>
 </resources>

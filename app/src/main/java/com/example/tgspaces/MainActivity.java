@@ -9,7 +9,6 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
-import android.graphics.Color;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
@@ -30,6 +29,7 @@ import android.widget.Toast;
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import androidx.core.graphics.Insets;
@@ -66,9 +66,15 @@ public class MainActivity extends AppCompatActivity {
     private static final String KEY_SLOT_AUTO_OPENED_PREFIX = "slot_auto_opened_";
     private static final String KEY_SLOT_HIDDEN_PREFIX = "slot_hidden_";
     private static final String KEY_FIRST_LAUNCH_HELP_SHOWN = "first_launch_help_shown";
+    private static final String KEY_DISPLAY_MODE_COMPACT = "display_mode_compact";
+    private static final String KEY_THEME_MODE = "theme_mode";
+    private static final String THEME_MODE_SYSTEM = "system";
+    private static final String THEME_MODE_LIGHT = "light";
+    private static final String THEME_MODE_DARK = "dark";
     private static final String KEY_APP_UPDATE_DOWNLOAD_ID = "app_update_download_id";
     private static final String KEY_APP_UPDATE_APK_PATH = "app_update_apk_path";
     private static final String KEY_APP_UPDATE_DOWNLOAD_FAILED = "app_update_download_failed";
+    private static final String KEY_SETTINGS_CATALOG_REFRESHED = "settings_catalog_refreshed";
     private static final int MAX_CLONE_APKS = 10;
     private static final String CATALOG_URL = "https://raw.githubusercontent.com/DesperadoBoi/TGSpaces/main/catalog/clones.json";
     private static final String APP_CATALOG_URL = "https://raw.githubusercontent.com/DesperadoBoi/TGSpaces/main/catalog/app.json";
@@ -84,9 +90,11 @@ public class MainActivity extends AppCompatActivity {
     private TextView appUpdateText;
     private Button appUpdateButton;
     private LinearLayout slotsContainer;
-    private Button manualUpdateButton;
+    private Button displayModeToggleButton;
     private int visibleSlotCount = 1;
     private boolean slotVisibilityLogged;
+    private boolean compactDisplayMode;
+    private String themeMode = THEME_MODE_DARK;
 
     private final Runnable progressRunnable = new Runnable() {
         @Override
@@ -122,6 +130,10 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        SharedPreferences startupPreferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        themeMode = startupPreferences.getString(KEY_THEME_MODE, THEME_MODE_DARK);
+        applyThemeMode(themeMode);
+
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_main);
@@ -136,12 +148,16 @@ public class MainActivity extends AppCompatActivity {
         appUpdateText = findViewById(R.id.appUpdateText);
         appUpdateButton = findViewById(R.id.buttonDownloadAppUpdate);
         slotsContainer = findViewById(R.id.slotsContainer);
-        manualUpdateButton = findViewById(R.id.buttonRefresh);
+        displayModeToggleButton = findViewById(R.id.buttonDisplayModeToggle);
+        compactDisplayMode = preferences.getBoolean(KEY_DISPLAY_MODE_COMPACT, false);
+        themeMode = preferences.getString(KEY_THEME_MODE, THEME_MODE_DARK);
+        Log.d(TAG, "display mode loaded: " + (compactDisplayMode ? "compact" : "cards"));
 
         findViewById(R.id.buttonAddSlot).setOnClickListener(view -> addSlot());
-        manualUpdateButton.setOnClickListener(view -> checkUpdatesManually());
-        findViewById(R.id.buttonHelp).setOnClickListener(view -> showHelpDialog());
+        displayModeToggleButton.setOnClickListener(view -> setDisplayMode(!compactDisplayMode));
+        findViewById(R.id.buttonSettings).setOnClickListener(view -> openSettings());
         appUpdateButton.setOnClickListener(view -> downloadAppUpdate());
+        updateDisplayModeToggleText();
 
         IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
         ContextCompat.registerReceiver(this, downloadReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
@@ -157,6 +173,23 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        String newThemeMode = preferences.getString(KEY_THEME_MODE, THEME_MODE_DARK);
+        if (!newThemeMode.equals(themeMode)) {
+            themeMode = newThemeMode;
+            applyThemeMode(themeMode);
+            recreate();
+            return;
+        }
+        boolean newCompactMode = preferences.getBoolean(KEY_DISPLAY_MODE_COMPACT, false);
+        if (compactDisplayMode != newCompactMode) {
+            compactDisplayMode = newCompactMode;
+            updateDisplayModeToggleText();
+        }
+        if (preferences.getBoolean(KEY_SETTINGS_CATALOG_REFRESHED, false)) {
+            preferences.edit().remove(KEY_SETTINGS_CATALOG_REFRESHED).apply();
+            loadCloneCatalog();
+            loadAppCatalog();
+        }
         checkDownloadsForTerminalStates(false);
         checkAppUpdateDownload(true);
         renderSlots();
@@ -182,21 +215,67 @@ public class MainActivity extends AppCompatActivity {
             if (isSlotHidden(slot) && !isAppInstalled(packageName(slot))) {
                 continue;
             }
-            slotsContainer.addView(createSlotCard(slot));
+            slotsContainer.addView(compactDisplayMode ? renderCompactSlot(slot) : renderCardSlot(slot));
         }
         scheduleProgressRefreshIfNeeded();
     }
 
-    private View createSlotCard(int slot) {
+    private void setDisplayMode(boolean compact) {
+        if (compactDisplayMode == compact) {
+            return;
+        }
+        compactDisplayMode = compact;
+        preferences.edit().putBoolean(KEY_DISPLAY_MODE_COMPACT, compactDisplayMode).apply();
+        Log.d(TAG, "display mode changed: " + (compactDisplayMode ? "compact" : "cards"));
+        updateDisplayModeToggleText();
+        renderSlots();
+    }
+
+    private void updateDisplayModeToggleText() {
+        if (displayModeToggleButton == null) {
+            return;
+        }
+
+        displayModeToggleButton.setText(compactDisplayMode ? "Карточки" : "Компактно");
+    }
+
+    private void openSettings() {
+        startActivity(new Intent(this, SettingsActivity.class));
+    }
+
+    private void setThemeMode(String mode) {
+        if (mode.equals(themeMode)) {
+            return;
+        }
+
+        themeMode = mode;
+        preferences.edit().putString(KEY_THEME_MODE, themeMode).apply();
+        applyThemeMode(themeMode);
+        recreate();
+    }
+
+    private void applyThemeMode(String mode) {
+        int nightMode;
+        if (THEME_MODE_LIGHT.equals(mode)) {
+            nightMode = AppCompatDelegate.MODE_NIGHT_NO;
+        } else if (THEME_MODE_DARK.equals(mode)) {
+            nightMode = AppCompatDelegate.MODE_NIGHT_YES;
+        } else {
+            nightMode = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM;
+        }
+        AppCompatDelegate.setDefaultNightMode(nightMode);
+    }
+
+    private View renderCardSlot(int slot) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(14), dp(14), dp(14), dp(14));
+        card.setPadding(dp(12), dp(9), dp(12), dp(9));
 
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
         );
-        cardParams.setMargins(0, 0, 0, dp(12));
+        cardParams.setMargins(0, 0, 0, dp(10));
         card.setLayoutParams(cardParams);
 
         SlotState state = getSlotState(slot);
@@ -208,8 +287,8 @@ public class MainActivity extends AppCompatActivity {
 
         TextView title = new TextView(this);
         title.setText(slotName(slot));
-        title.setTextColor(Color.parseColor("#F8FAFC"));
-        title.setTextSize(23);
+        title.setTextColor(ContextCompat.getColor(this, R.color.text_primary));
+        title.setTextSize(19);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         card.addView(title);
 
@@ -218,14 +297,16 @@ public class MainActivity extends AppCompatActivity {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
         );
-        statusParams.topMargin = dp(4);
+        statusParams.topMargin = dp(2);
         status.setLayoutParams(statusParams);
-        status.setText(state.statusText);
-        status.setTextColor(state.statusColor);
-        status.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        status.setText(compactStatusText(slot, state));
+        status.setTextColor(ContextCompat.getColor(this, state.statusColorRes));
+        status.setTextSize(14);
         card.addView(status);
 
-        if (state.hintText != null) {
+        if (state.hintText != null
+                && state.type != SlotStateType.INSTALLED
+                && state.type != SlotStateType.UPDATE_AVAILABLE) {
             TextView hint = new TextView(this);
             LinearLayout.LayoutParams hintParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -234,45 +315,131 @@ public class MainActivity extends AppCompatActivity {
             hintParams.topMargin = dp(6);
             hint.setLayoutParams(hintParams);
             hint.setText(state.hintText);
-            hint.setTextColor(Color.parseColor("#CBD5E1"));
-            hint.setTextSize(15);
+            hint.setTextColor(ContextCompat.getColor(this, R.color.text_secondary));
+            hint.setTextSize(13);
             hint.setLineSpacing(dp(2), 1.0f);
             card.addView(hint);
         }
 
+        addSlotPrimaryAction(card, slot, state, false);
+        return card;
+    }
+
+    private View renderCompactSlot(int slot) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(dp(8), dp(5), dp(6), dp(5));
+
+        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        rowParams.setMargins(0, 0, 0, dp(3));
+        row.setLayoutParams(rowParams);
+
+        SlotState state = getSlotState(slot);
+        row.setBackgroundResource(
+                state.type == SlotStateType.UPDATE_AVAILABLE
+                        ? R.drawable.slot_compact_update_background
+                        : R.drawable.slot_compact_background
+        );
+
+        LinearLayout textColumn = new LinearLayout(this);
+        textColumn.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1
+        );
+        textParams.setMargins(0, 0, dp(8), 0);
+        textColumn.setLayoutParams(textParams);
+
+        TextView title = new TextView(this);
+        title.setText(slotName(slot));
+        title.setTextColor(ContextCompat.getColor(this, R.color.text_primary));
+        title.setTextSize(15);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        textColumn.addView(title);
+
+        TextView status = new TextView(this);
+        LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        statusParams.topMargin = dp(2);
+        status.setLayoutParams(statusParams);
+        status.setText(compactStatusText(slot, state));
+        status.setTextColor(ContextCompat.getColor(this, state.statusColorRes));
+        status.setTextSize(12);
+        textColumn.addView(status);
+
+        row.addView(textColumn);
+        addSlotPrimaryAction(row, slot, state, true);
+        return row;
+    }
+
+    private void addSlotPrimaryAction(LinearLayout card, int slot, SlotState state, boolean compact) {
         switch (state.type) {
             case UPDATE_AVAILABLE:
                 addActionRow(card,
-                        createButton("Обновить", true, true, view -> downloadCloneApk(slot)),
-                        createMenuButton(view -> showSlotMenu(view, slot, state.type)));
+                        createButton("Обновить", true, true, compact, view -> downloadCloneApk(slot)),
+                        createMenuButton(compact, view -> showSlotMenu(view, slot, state.type)),
+                        compact);
                 break;
             case INSTALLED:
                 addActionRow(card,
-                        createButton("Открыть", true, true, view -> openSlot(slot)),
-                        createMenuButton(view -> showSlotMenu(view, slot, state.type)));
+                        createButton("Открыть", true, true, compact, view -> openSlot(slot)),
+                        createMenuButton(compact, view -> showSlotMenu(view, slot, state.type)),
+                        compact);
                 break;
             case DOWNLOADING:
-                card.addView(createButton("Отменить", true, true, view -> cancelCloneDownload(slot)));
+                addSingleAction(card, createButton("Отменить", true, true, compact, view -> cancelCloneDownload(slot)), compact);
                 break;
             case WAITING_INSTALL:
                 addActionRow(card,
-                        createButton("Открыть установщик", true, true, view -> openInstallerForDownloadedApk(slot, getKnownDownloadId(slot))),
-                        createMenuButton(view -> showSlotMenu(view, slot, state.type)));
+                        createButton(compact ? "Установщик" : "Открыть установщик", true, true, compact, view -> openInstallerForDownloadedApk(slot, getKnownDownloadId(slot))),
+                        createMenuButton(compact, view -> showSlotMenu(view, slot, state.type)),
+                        compact);
                 break;
             case DOWNLOAD_ERROR:
                 addActionRow(card,
-                        createButton("Повторить", true, true, view -> retryCloneDownload(slot)),
-                        createMenuButton(view -> showSlotMenu(view, slot, state.type)));
+                        createButton("Повторить", true, true, compact, view -> retryCloneDownload(slot)),
+                        createMenuButton(compact, view -> showSlotMenu(view, slot, state.type)),
+                        compact);
                 break;
             case NOT_INSTALLED:
             default:
                 addActionRow(card,
-                        createButton("Установить", true, true, view -> showInstallDialog(slot)),
-                        createMenuButton(view -> showSlotMenu(view, slot, state.type)));
+                        createButton("Установить", true, true, compact, view -> showInstallDialog(slot)),
+                        createMenuButton(compact, view -> showSlotMenu(view, slot, state.type)),
+                        compact);
                 break;
         }
+    }
 
-        return card;
+    private String compactStatusText(int slot, SlotState state) {
+        switch (state.type) {
+            case INSTALLED: {
+                InstalledCloneInfo installedCloneInfo = getInstalledCloneInfo(slot);
+                String versionName = installedCloneInfo != null ? installedCloneInfo.versionName : "";
+                return versionName == null || versionName.isEmpty()
+                        ? "Установлено"
+                        : "Установлено · " + versionName;
+            }
+            case UPDATE_AVAILABLE: {
+                InstalledCloneInfo installedCloneInfo = getInstalledCloneInfo(slot);
+                CloneInfo cloneInfo = cloneCatalog.get(slot);
+                String installed = installedCloneInfo != null ? versionText(installedCloneInfo.versionName) : "неизвестно";
+                String remote = cloneInfo != null ? versionText(cloneInfo.versionName) : "неизвестно";
+                return "Обновление · " + installed + " → " + remote;
+            }
+            case DOWNLOADING:
+            case WAITING_INSTALL:
+            case DOWNLOAD_ERROR:
+            case NOT_INSTALLED:
+            default:
+                return state.statusText;
+        }
     }
 
     private void addButtonRow(LinearLayout card, Button first, Button second) {
@@ -306,26 +473,26 @@ public class MainActivity extends AppCompatActivity {
         card.addView(row);
     }
 
-    private void addActionRow(LinearLayout card, Button primaryButton, Button menuButton) {
+    private void addActionRow(LinearLayout card, Button primaryButton, Button menuButton, boolean compact) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
+                compact ? LinearLayout.LayoutParams.WRAP_CONTENT : LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
         );
-        rowParams.topMargin = dp(8);
+        rowParams.topMargin = compact ? 0 : dp(8);
         row.setLayoutParams(rowParams);
 
         LinearLayout.LayoutParams primaryParams = new LinearLayout.LayoutParams(
-                0,
+                compact ? LinearLayout.LayoutParams.WRAP_CONTENT : 0,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                1
+                compact ? 0 : 1
         );
-        primaryParams.setMargins(0, 0, dp(8), 0);
+        primaryParams.setMargins(0, 0, dp(6), 0);
         primaryButton.setLayoutParams(primaryParams);
 
         LinearLayout.LayoutParams menuParams = new LinearLayout.LayoutParams(
-                dp(52),
+                dp(compact ? 34 : 40),
                 LinearLayout.LayoutParams.WRAP_CONTENT
         );
         menuButton.setLayoutParams(menuParams);
@@ -335,36 +502,56 @@ public class MainActivity extends AppCompatActivity {
         card.addView(row);
     }
 
-    private Button createButton(String text, boolean primary, boolean enabled, View.OnClickListener listener) {
+    private void addSingleAction(LinearLayout card, Button primaryButton, boolean compact) {
+        if (!compact) {
+            card.addView(primaryButton);
+            return;
+        }
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        primaryButton.setLayoutParams(params);
+        card.addView(primaryButton);
+    }
+
+    private Button createButton(String text, boolean primary, boolean enabled, boolean compact, View.OnClickListener listener) {
         Button button = new Button(this);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
         );
-        params.topMargin = dp(8);
+        params.topMargin = compact ? 0 : dp(8);
         button.setLayoutParams(params);
         button.setText(text);
         button.setAllCaps(false);
         button.setEnabled(enabled);
         button.setTypeface(Typeface.DEFAULT, primary ? Typeface.BOLD : Typeface.NORMAL);
-        button.setMinHeight(dp(44));
-        button.setTextColor(Color.parseColor("#F8FAFC"));
-        button.setBackgroundResource(primary ? R.drawable.button_primary_background : R.drawable.button_secondary_background);
+        button.setMinHeight(dp(compact ? 30 : 40));
+        button.setMinimumHeight(dp(compact ? 30 : 40));
+        button.setPadding(dp(compact ? 10 : 14), 0, dp(compact ? 10 : 14), 0);
+        button.setTextSize(compact ? 12 : 13);
+        button.setTextColor(ContextCompat.getColor(this, primary ? R.color.slot_action_text : R.color.button_secondary_text));
+        button.setBackgroundResource(primary ? R.drawable.button_slot_action_background : R.drawable.button_secondary_background);
         if (listener != null) {
             button.setOnClickListener(listener);
         }
         return button;
     }
 
-    private Button createMenuButton(View.OnClickListener listener) {
+    private Button createMenuButton(boolean compact, View.OnClickListener listener) {
         Button button = new Button(this);
         button.setText("⋮");
         button.setAllCaps(false);
         button.setEnabled(true);
         button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        button.setMinHeight(dp(44));
-        button.setTextColor(Color.parseColor("#F8FAFC"));
-        button.setBackgroundResource(R.drawable.button_secondary_background);
+        button.setMinHeight(dp(compact ? 30 : 40));
+        button.setMinimumHeight(dp(compact ? 30 : 40));
+        button.setPadding(0, 0, 0, 0);
+        button.setTextSize(compact ? 16 : 18);
+        button.setTextColor(ContextCompat.getColor(this, R.color.button_secondary_text));
+        button.setBackgroundResource(R.drawable.button_overflow_background);
         button.setOnClickListener(listener);
         return button;
     }
@@ -710,53 +897,6 @@ public class MainActivity extends AppCompatActivity {
                 .setPositiveButton("Скачать и установить", (dialog, which) -> downloadCloneApk(slot))
                 .setNegativeButton("Отмена", null)
                 .show();
-    }
-
-    private void checkUpdatesManually() {
-        if (manualUpdateButton == null || !manualUpdateButton.isEnabled()) {
-            return;
-        }
-
-        Log.d(TAG, "manual update check started");
-        manualUpdateButton.setEnabled(false);
-        manualUpdateButton.setText("Проверяем…");
-
-        new Thread(() -> {
-            try {
-                Map<Integer, CloneInfo> loadedCloneCatalog = parseCloneCatalog(downloadText(CATALOG_URL));
-                AppUpdateInfo loadedAppUpdateInfo = parseAppUpdateInfo(downloadText(APP_CATALOG_URL));
-
-                runOnUiThread(() -> {
-                    cloneCatalog.clear();
-                    cloneCatalog.putAll(loadedCloneCatalog);
-                    appUpdateInfo = loadedAppUpdateInfo;
-                    checkDownloadsForTerminalStates(false);
-                    renderSlots();
-                    renderAppUpdateBanner();
-                    resetManualUpdateButton();
-                    Log.d(TAG, "manual update check finished");
-                    Toast.makeText(this, "Обновления проверены", Toast.LENGTH_SHORT).show();
-                });
-            } catch (Exception e) {
-                Log.w(TAG, "manual update check failed", e);
-                runOnUiThread(() -> {
-                    checkDownloadsForTerminalStates(false);
-                    renderSlots();
-                    renderAppUpdateBanner();
-                    resetManualUpdateButton();
-                    Log.d(TAG, "manual update check finished");
-                    Toast.makeText(this, "Не удалось проверить обновления, используется сохранённая информация", Toast.LENGTH_SHORT).show();
-                });
-            }
-        }, "TGSpacesManualUpdateCheck").start();
-    }
-
-    private void resetManualUpdateButton() {
-        if (manualUpdateButton == null) {
-            return;
-        }
-        manualUpdateButton.setEnabled(true);
-        manualUpdateButton.setText("Проверить обновления");
     }
 
     private void loadAppCatalog() {
@@ -1763,18 +1903,18 @@ public class MainActivity extends AppCompatActivity {
         final SlotStateType type;
         final String statusText;
         final String hintText;
-        final int statusColor;
+        final int statusColorRes;
 
-        SlotState(SlotStateType type, String statusText, String hintText, int statusColor) {
+        SlotState(SlotStateType type, String statusText, String hintText, int statusColorRes) {
             this.type = type;
             this.statusText = statusText;
             this.hintText = hintText;
-            this.statusColor = statusColor;
+            this.statusColorRes = statusColorRes;
         }
 
         static SlotState installed(String versionName) {
             String hintText = versionName == null || versionName.isEmpty() ? null : "Версия: " + versionName;
-            return new SlotState(SlotStateType.INSTALLED, "Установлено", hintText, Color.parseColor("#86EFAC"));
+            return new SlotState(SlotStateType.INSTALLED, "Установлено", hintText, R.color.status_success);
         }
 
         static SlotState updateAvailable(String installedVersionName, String remoteVersionName) {
@@ -1788,16 +1928,16 @@ public class MainActivity extends AppCompatActivity {
                     SlotStateType.UPDATE_AVAILABLE,
                     "Доступно обновление",
                     "Установлена: " + installed + "\nНовая: " + remote,
-                    Color.parseColor("#FBBF24")
+                    R.color.status_update
             );
         }
 
         static SlotState notInstalled() {
-            return new SlotState(SlotStateType.NOT_INSTALLED, "Не установлен", null, Color.parseColor("#FCA5A5"));
+            return new SlotState(SlotStateType.NOT_INSTALLED, "Не установлен", null, R.color.status_error);
         }
 
         static SlotState downloading(String statusText, String hintText) {
-            return new SlotState(SlotStateType.DOWNLOADING, statusText, hintText, Color.parseColor("#FBBF24"));
+            return new SlotState(SlotStateType.DOWNLOADING, statusText, hintText, R.color.status_update);
         }
 
         static SlotState waitingInstall() {
@@ -1805,12 +1945,12 @@ public class MainActivity extends AppCompatActivity {
                     SlotStateType.WAITING_INSTALL,
                     "Ожидает установки",
                     "Подтвердите установку в системном окне Android",
-                    Color.parseColor("#93C5FD")
+                    R.color.status_info
             );
         }
 
         static SlotState error(String message) {
-            return new SlotState(SlotStateType.DOWNLOAD_ERROR, "Ошибка загрузки", message, Color.parseColor("#FCA5A5"));
+            return new SlotState(SlotStateType.DOWNLOAD_ERROR, "Ошибка загрузки", message, R.color.status_error);
         }
     }
 
