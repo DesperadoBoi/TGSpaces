@@ -1,17 +1,14 @@
 # Инструкция релиза
 
-## Проекты
+## Локальные директории
 
-Основной проект TGSpaces:
+Локальные директории разработчика задаются самостоятельно:
 
-```text
-D:\Projects\TGSpaces
-```
-
-Базовый проект Telegram-клонов:
-
-```text
-D:\Projects\TelegramClones\TelegramBase
+```powershell
+$TGSpacesDir = "<TGSPACES_DIR>"
+$TelegramBaseDir = "<TELEGRAM_BASE_DIR>"
+$SigningDir = "<SIGNING_DIR>"
+$ReleaseKeystorePath = "<RELEASE_KEYSTORE_PATH>"
 ```
 
 ## Подготовка release-комплекта
@@ -38,4 +35,4 @@ D:\Projects\TelegramClones\TelegramBase
 
 ## Важно
 
-Signing key `D:\Projects\signing\tgspaces-release.jks` нельзя терять и нельзя коммитить.
+Release signing key нельзя терять и нельзя коммитить. В публичной документации и репозитории используйте только нейтральное обозначение `<RELEASE_KEYSTORE_PATH>`.
