@@ -18,6 +18,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
 import android.content.res.Configuration;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -91,10 +93,18 @@ public class MainActivity extends AppCompatActivity {
     private TextView appUpdateText;
     private Button appUpdateButton;
     private LinearLayout slotsContainer;
+    private LinearLayout slotEmptyState;
     private Button displayModeToggleButton;
+    private EditText slotSearchInput;
+    private Button filterAllButton;
+    private Button filterInstalledButton;
+    private Button filterFreeButton;
+    private Button filterUpdatesButton;
     private int visibleSlotCount = 1;
     private boolean slotVisibilityLogged;
     private boolean compactDisplayMode;
+    private String slotSearchQuery = "";
+    private SlotFilter activeSlotFilter = SlotFilter.ALL;
     private String themeMode = THEME_MODE_DARK;
 
     private final Runnable progressRunnable = new Runnable() {
@@ -149,7 +159,13 @@ public class MainActivity extends AppCompatActivity {
         appUpdateText = findViewById(R.id.appUpdateText);
         appUpdateButton = findViewById(R.id.buttonDownloadAppUpdate);
         slotsContainer = findViewById(R.id.slotsContainer);
+        slotEmptyState = findViewById(R.id.slotEmptyState);
         displayModeToggleButton = findViewById(R.id.buttonDisplayModeToggle);
+        slotSearchInput = findViewById(R.id.inputSlotSearch);
+        filterAllButton = findViewById(R.id.filterAll);
+        filterInstalledButton = findViewById(R.id.filterInstalled);
+        filterFreeButton = findViewById(R.id.filterFree);
+        filterUpdatesButton = findViewById(R.id.filterUpdates);
         compactDisplayMode = preferences.getBoolean(KEY_DISPLAY_MODE_COMPACT, false);
         themeMode = preferences.getString(KEY_THEME_MODE, THEME_MODE_DARK);
         Log.d(TAG, "display mode loaded: " + (compactDisplayMode ? "compact" : "cards"));
@@ -161,6 +177,7 @@ public class MainActivity extends AppCompatActivity {
         appUpdateButton.setOnClickListener(view -> downloadAppUpdate());
         updateDisplayModeToggleText();
         updateThemeToggleButton();
+        setupSlotSearchAndFilters();
 
         IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
         ContextCompat.registerReceiver(this, downloadReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
@@ -214,13 +231,104 @@ public class MainActivity extends AppCompatActivity {
         logSlotVisibilityStateOnce();
 
         slotsContainer.removeAllViews();
+        int renderedSlots = 0;
         for (int slot = 1; slot <= visibleSlotCount; slot++) {
             if (isSlotHidden(slot) && !isAppInstalled(packageName(slot))) {
                 continue;
             }
+            SlotState state = getSlotState(slot);
+            if (!matchesSlotFilters(slot, state)) {
+                continue;
+            }
             slotsContainer.addView(compactDisplayMode ? renderCompactSlot(slot) : renderCardSlot(slot));
+            renderedSlots++;
         }
+        slotEmptyState.setVisibility(renderedSlots == 0 ? View.VISIBLE : View.GONE);
         scheduleProgressRefreshIfNeeded();
+    }
+
+    private void setupSlotSearchAndFilters() {
+        slotSearchInput.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence text, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence text, int start, int before, int count) {
+                slotSearchQuery = text != null ? text.toString().trim().toLowerCase(Locale.US) : "";
+                renderSlots();
+            }
+
+            @Override
+            public void afterTextChanged(Editable editable) {
+            }
+        });
+
+        filterAllButton.setOnClickListener(view -> setSlotFilter(SlotFilter.ALL));
+        filterInstalledButton.setOnClickListener(view -> setSlotFilter(SlotFilter.INSTALLED));
+        filterFreeButton.setOnClickListener(view -> setSlotFilter(SlotFilter.FREE));
+        filterUpdatesButton.setOnClickListener(view -> setSlotFilter(SlotFilter.UPDATES));
+        updateSlotFilterChips();
+    }
+
+    private void setSlotFilter(SlotFilter filter) {
+        if (activeSlotFilter == filter) {
+            return;
+        }
+        activeSlotFilter = filter;
+        updateSlotFilterChips();
+        renderSlots();
+    }
+
+    private void updateSlotFilterChips() {
+        styleSlotFilterChip(filterAllButton, activeSlotFilter == SlotFilter.ALL);
+        styleSlotFilterChip(filterInstalledButton, activeSlotFilter == SlotFilter.INSTALLED);
+        styleSlotFilterChip(filterFreeButton, activeSlotFilter == SlotFilter.FREE);
+        styleSlotFilterChip(filterUpdatesButton, activeSlotFilter == SlotFilter.UPDATES);
+    }
+
+    private void styleSlotFilterChip(Button button, boolean active) {
+        button.setTextColor(ContextCompat.getColor(this, active ? R.color.button_primary_text : R.color.button_secondary_text));
+        button.setBackgroundResource(active ? R.drawable.button_segment_active_background : R.drawable.button_secondary_background);
+        button.setTypeface(Typeface.DEFAULT, active ? Typeface.BOLD : Typeface.NORMAL);
+    }
+
+    private boolean matchesSlotFilters(int slot, SlotState state) {
+        if (!matchesSlotFilter(state)) {
+            return false;
+        }
+        if (slotSearchQuery.isEmpty()) {
+            return true;
+        }
+
+        String slotNumber = String.valueOf(slot);
+        String paddedSlotNumber = String.format(Locale.US, "%02d", slot);
+        String displayName = slotName(slot).toLowerCase(Locale.US);
+        String defaultName = defaultSlotName(slot).toLowerCase(Locale.US);
+        String catalogName = cloneName(slot).toLowerCase(Locale.US);
+
+        return slotNumber.contains(slotSearchQuery)
+                || paddedSlotNumber.contains(slotSearchQuery)
+                || displayName.contains(slotSearchQuery)
+                || defaultName.contains(slotSearchQuery)
+                || catalogName.contains(slotSearchQuery);
+    }
+
+    private boolean matchesSlotFilter(SlotState state) {
+        switch (activeSlotFilter) {
+            case INSTALLED:
+                return state.type == SlotStateType.INSTALLED || state.type == SlotStateType.UPDATE_AVAILABLE;
+            case FREE:
+                return state.type == SlotStateType.NOT_INSTALLED
+                        || state.type == SlotStateType.DOWNLOADING
+                        || state.type == SlotStateType.WAITING_INSTALL
+                        || state.type == SlotStateType.DOWNLOAD_ERROR;
+            case UPDATES:
+                return state.type == SlotStateType.UPDATE_AVAILABLE;
+            case ALL:
+            default:
+                return true;
+        }
     }
 
     private void setDisplayMode(boolean compact) {
@@ -430,20 +538,20 @@ public class MainActivity extends AppCompatActivity {
                 break;
             case WAITING_INSTALL:
                 addActionRow(card,
-                        createButton(compact ? "Установщик" : "Открыть установщик", true, true, compact, view -> openInstallerForDownloadedApk(slot, getKnownDownloadId(slot))),
+                        createButton("Продолжить установку", true, true, compact, view -> openInstallerForDownloadedApk(slot, getKnownDownloadId(slot))),
                         createMenuButton(compact, view -> showSlotMenu(view, slot, state.type)),
                         compact);
                 break;
             case DOWNLOAD_ERROR:
                 addActionRow(card,
-                        createButton("Повторить", true, true, compact, view -> retryCloneDownload(slot)),
+                        createButton("Повторить загрузку", true, true, compact, view -> retryCloneDownload(slot)),
                         createMenuButton(compact, view -> showSlotMenu(view, slot, state.type)),
                         compact);
                 break;
             case NOT_INSTALLED:
             default:
                 addActionRow(card,
-                        createButton("Установить", true, true, compact, view -> showInstallDialog(slot)),
+                        createButton("Скачать и установить", true, true, compact, view -> showInstallDialog(slot)),
                         createMenuButton(compact, view -> showSlotMenu(view, slot, state.type)),
                         compact);
                 break;
@@ -663,7 +771,7 @@ public class MainActivity extends AppCompatActivity {
                                 + "Слот — это отдельная копия Telegram с отдельным входом в аккаунт.\n\n"
                                 + "Как установить клон:\n"
                                 + "1. Нажмите \"Добавить слот\".\n"
-                                + "2. Нажмите \"Установить клон\".\n"
+                                + "2. Нажмите \"Скачать и установить\".\n"
                                 + "3. Дождитесь загрузки APK.\n"
                                 + "4. Подтвердите установку в системном установщике Android.\n\n"
                                 + "Важно:\n"
@@ -698,7 +806,7 @@ public class MainActivity extends AppCompatActivity {
                 return SlotState.error(message);
             }
             if (info.status == DownloadManager.STATUS_PAUSED) {
-                return SlotState.downloading("Скачивается APK...", downloadReasonToMessage(info.reason));
+                return SlotState.downloading("Загрузка приостановлена", downloadReasonToMessage(info.reason));
             }
             return SlotState.downloading(progressText(info), null);
         }
@@ -733,9 +841,9 @@ public class MainActivity extends AppCompatActivity {
     private String progressText(DownloadInfo info) {
         if (info.totalBytes > 0 && info.downloadedBytes >= 0) {
             int percent = (int) Math.min(100, Math.max(0, (info.downloadedBytes * 100L) / info.totalBytes));
-            return "Скачивается APK... " + percent + "%";
+            return "Скачивание APK... " + percent + "%";
         }
-        return "Скачивается APK...";
+        return "Скачивание APK...";
     }
 
     private void addSlot() {
@@ -747,13 +855,14 @@ public class MainActivity extends AppCompatActivity {
                     .apply();
             Log.d(TAG, "hidden slot restored: slot=" + hiddenSlot);
             renderSlots();
+            showSlotAddedFilterHintIfNeeded(hiddenSlot);
             return;
         }
 
         if (visibleSlotCount >= MAX_CLONE_APKS) {
             new AlertDialog.Builder(this)
                     .setTitle("Слоты закончились")
-                    .setMessage("Сейчас доступно максимум " + MAX_CLONE_APKS + " clone APK.")
+                    .setMessage("Сейчас доступно максимум " + MAX_CLONE_APKS + " клонов.")
                     .setPositiveButton("OK", null)
                     .show();
             return;
@@ -761,6 +870,14 @@ public class MainActivity extends AppCompatActivity {
 
         preferences.edit().putInt(KEY_SLOT_COUNT, visibleSlotCount + 1).apply();
         renderSlots();
+        showSlotAddedFilterHintIfNeeded(visibleSlotCount);
+    }
+
+    private void showSlotAddedFilterHintIfNeeded(int slot) {
+        SlotState state = getSlotState(slot);
+        if (!matchesSlotFilters(slot, state)) {
+            Toast.makeText(this, "Слот добавлен. Измените фильтр, чтобы увидеть его.", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private int firstHiddenSlot() {
@@ -926,7 +1043,7 @@ public class MainActivity extends AppCompatActivity {
 
         new AlertDialog.Builder(this)
                 .setTitle("Установка " + cloneName(slot))
-                .setMessage("TGSpaces скачает APK этого клона и откроет системный установщик Android. Подтвердите установку. Если Android попросит разрешить установку из TGSpaces - разрешите её в настройках.")
+                .setMessage("TGSpaces скачает APK этого клона. После скачивания откроется системный установщик Android. Без подтверждения в Android клон не установится.")
                 .setPositiveButton("Скачать и установить", (dialog, which) -> downloadCloneApk(slot))
                 .setNegativeButton("Отмена", null)
                 .show();
@@ -1210,7 +1327,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (!verifyDownloadedCloneApk(slot, info)) {
-            showDownloadError(slot, "Ошибка проверки SHA-256 APK");
+            showDownloadError(slot, apkSecurityCheckErrorMessage());
             clearSlotDownload(slot);
             return;
         }
@@ -1234,7 +1351,7 @@ public class MainActivity extends AppCompatActivity {
             }
             if (info.status == DownloadManager.STATUS_SUCCESSFUL) {
                 if (!verifyDownloadedCloneApk(slot, info)) {
-                    storeDownloadError(slot, "Ошибка проверки SHA-256 APK");
+                    storeDownloadError(slot, apkSecurityCheckErrorMessage());
                     clearSlotDownload(slot);
                     continue;
                 }
@@ -1412,7 +1529,7 @@ public class MainActivity extends AppCompatActivity {
             }
 
             if (!verifyCloneInstallerUri(slot, uri)) {
-                showDownloadError(slot, "Ошибка проверки SHA-256 APK");
+                showDownloadError(slot, apkSecurityCheckErrorMessage());
                 return false;
             }
 
@@ -1552,6 +1669,10 @@ public class MainActivity extends AppCompatActivity {
                 .setMessage(message)
                 .setPositiveButton("OK", null)
                 .show();
+    }
+
+    private static String apkSecurityCheckErrorMessage() {
+        return "APK не прошёл проверку безопасности. Файл повреждён или не совпадает с каталогом. Установка остановлена.";
     }
 
     private void storeDownloadError(int slot, String message) {
@@ -1765,7 +1886,7 @@ public class MainActivity extends AppCompatActivity {
             case DownloadManager.ERROR_TOO_MANY_REDIRECTS:
                 return "Слишком много перенаправлений при загрузке";
             case DownloadManager.ERROR_UNHANDLED_HTTP_CODE:
-                return "GitHub вернул неожиданный HTTP-код. Проверьте, что APK загружен в Release";
+                return "APK недоступен в GitHub Release. Возможно, файл ещё не загружен или ссылка устарела.";
             case DownloadManager.ERROR_UNKNOWN:
                 return "Неизвестная ошибка загрузки";
             case DownloadManager.PAUSED_QUEUED_FOR_WIFI:
@@ -1932,6 +2053,13 @@ public class MainActivity extends AppCompatActivity {
         DOWNLOAD_ERROR
     }
 
+    private enum SlotFilter {
+        ALL,
+        INSTALLED,
+        FREE,
+        UPDATES
+    }
+
     private static class SlotState {
         final SlotStateType type;
         final String statusText;
@@ -1976,8 +2104,8 @@ public class MainActivity extends AppCompatActivity {
         static SlotState waitingInstall() {
             return new SlotState(
                     SlotStateType.WAITING_INSTALL,
-                    "Ожидает установки",
-                    "Подтвердите установку в системном окне Android",
+                    "APK скачан, установка не завершена",
+                    "Нажмите «Продолжить установку» и подтвердите установку в Android. Если вы отменили установку, APK уже скачан.",
                     R.color.status_info
             );
         }
