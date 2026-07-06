@@ -67,6 +67,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String KEY_FIRST_LAUNCH_HELP_SHOWN = "first_launch_help_shown";
     private static final String KEY_APP_UPDATE_DOWNLOAD_ID = "app_update_download_id";
     private static final String KEY_APP_UPDATE_APK_PATH = "app_update_apk_path";
+    private static final String KEY_APP_UPDATE_DOWNLOAD_FAILED = "app_update_download_failed";
     private static final int MAX_CLONE_APKS = 10;
     private static final String CATALOG_URL = "https://raw.githubusercontent.com/DesperadoBoi/TGSpaces/main/catalog/clones.json";
     private static final String APP_CATALOG_URL = "https://raw.githubusercontent.com/DesperadoBoi/TGSpaces/main/catalog/app.json";
@@ -80,7 +81,9 @@ public class MainActivity extends AppCompatActivity {
     private SharedPreferences preferences;
     private LinearLayout appUpdateBanner;
     private TextView appUpdateText;
+    private Button appUpdateButton;
     private LinearLayout slotsContainer;
+    private Button manualUpdateButton;
     private int visibleSlotCount = 1;
 
     private final Runnable progressRunnable = new Runnable() {
@@ -129,15 +132,14 @@ public class MainActivity extends AppCompatActivity {
         preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         appUpdateBanner = findViewById(R.id.appUpdateBanner);
         appUpdateText = findViewById(R.id.appUpdateText);
+        appUpdateButton = findViewById(R.id.buttonDownloadAppUpdate);
         slotsContainer = findViewById(R.id.slotsContainer);
+        manualUpdateButton = findViewById(R.id.buttonRefresh);
 
         findViewById(R.id.buttonAddSlot).setOnClickListener(view -> addSlot());
-        findViewById(R.id.buttonRefresh).setOnClickListener(view -> {
-            checkDownloadsForTerminalStates(false);
-            renderSlots();
-        });
+        manualUpdateButton.setOnClickListener(view -> checkUpdatesManually());
         findViewById(R.id.buttonHelp).setOnClickListener(view -> showHelpDialog());
-        findViewById(R.id.buttonDownloadAppUpdate).setOnClickListener(view -> downloadAppUpdate());
+        appUpdateButton.setOnClickListener(view -> downloadAppUpdate());
 
         IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
         ContextCompat.registerReceiver(this, downloadReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
@@ -249,17 +251,19 @@ public class MainActivity extends AppCompatActivity {
                 break;
             case DOWNLOADING:
                 card.addView(createButton("Скачивается...", true, false, null));
-                card.addView(createButton("Переименовать", false, true, view -> showRenameDialog(slot)));
+                addButtonRow(card,
+                        createButton("Отменить", false, true, view -> cancelCloneDownload(slot)),
+                        createButton("Переименовать", false, true, view -> showRenameDialog(slot)));
                 break;
             case WAITING_INSTALL:
                 card.addView(createButton("Открыть установщик", true, true, view -> openInstallerForDownloadedApk(slot, getKnownDownloadId(slot))));
                 addButtonRow(card,
-                        createButton("Повторить загрузку", false, true, view -> showInstallDialog(slot)),
+                        createButton("Скачать заново", false, true, view -> restartCloneDownload(slot)),
                         createButton("Переименовать", false, true, view -> showRenameDialog(slot)));
                 break;
             case DOWNLOAD_ERROR:
                 addButtonRow(card,
-                        createButton("Повторить", true, true, view -> showInstallDialog(slot)),
+                        createButton("Повторить", true, true, view -> retryCloneDownload(slot)),
                         createButton("Переименовать", false, true, view -> showRenameDialog(slot)));
                 break;
             case NOT_INSTALLED:
@@ -361,24 +365,6 @@ public class MainActivity extends AppCompatActivity {
 
     private SlotState getSlotState(int slot) {
         InstalledCloneInfo installedCloneInfo = getInstalledCloneInfo(slot);
-        if (installedCloneInfo != null) {
-            clearSlotDownload(slot);
-            if (preferences.getInt(KEY_PENDING_SLOT, 0) == slot) {
-                showInstalledCloneNoticeOnce(slot);
-                preferences.edit()
-                        .remove(KEY_PENDING_APK)
-                        .remove(KEY_PENDING_SLOT)
-                        .remove(KEY_PENDING_DOWNLOAD_ID)
-                        .remove(slotAutoOpenedKey(slot))
-                        .apply();
-            }
-            return installedSlotState(slot, installedCloneInfo);
-        }
-
-        if (hasPendingApk(slot)) {
-            return SlotState.waitingInstall();
-        }
-
         long downloadId = preferences.getLong(slotDownloadKey(slot), -1L);
         if (downloadId > 0) {
             DownloadInfo info = queryDownload(downloadId);
@@ -406,12 +392,32 @@ public class MainActivity extends AppCompatActivity {
             return SlotState.downloading(progressText(info), null);
         }
 
+        if (hasPendingApk(slot)) {
+            if (installedCloneInfo != null && isInstalledCloneCurrent(slot, installedCloneInfo)) {
+                showInstalledCloneNoticeOnce(slot);
+                clearPendingCloneInstall(slot);
+                return installedSlotState(slot, installedCloneInfo);
+            }
+            return SlotState.waitingInstall();
+        }
+
+        if (installedCloneInfo != null) {
+            return installedSlotState(slot, installedCloneInfo);
+        }
+
         String error = preferences.getString(slotErrorKey(slot), null);
         if (error != null) {
             return SlotState.error(error);
         }
 
         return SlotState.notInstalled();
+    }
+
+    private boolean isInstalledCloneCurrent(int slot, InstalledCloneInfo installedCloneInfo) {
+        CloneInfo cloneInfo = cloneCatalog.get(slot);
+        return cloneInfo == null
+                || cloneInfo.versionCode == null
+                || installedCloneInfo.versionCode >= cloneInfo.versionCode;
     }
 
     private String progressText(DownloadInfo info) {
@@ -540,43 +546,95 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
+    private void checkUpdatesManually() {
+        if (manualUpdateButton == null || !manualUpdateButton.isEnabled()) {
+            return;
+        }
+
+        Log.d(TAG, "manual update check started");
+        manualUpdateButton.setEnabled(false);
+        manualUpdateButton.setText("Проверяем…");
+
+        new Thread(() -> {
+            try {
+                Map<Integer, CloneInfo> loadedCloneCatalog = parseCloneCatalog(downloadText(CATALOG_URL));
+                AppUpdateInfo loadedAppUpdateInfo = parseAppUpdateInfo(downloadText(APP_CATALOG_URL));
+
+                runOnUiThread(() -> {
+                    cloneCatalog.clear();
+                    cloneCatalog.putAll(loadedCloneCatalog);
+                    appUpdateInfo = loadedAppUpdateInfo;
+                    checkDownloadsForTerminalStates(false);
+                    renderSlots();
+                    renderAppUpdateBanner();
+                    resetManualUpdateButton();
+                    Log.d(TAG, "manual update check finished");
+                    Toast.makeText(this, "Обновления проверены", Toast.LENGTH_SHORT).show();
+                });
+            } catch (Exception e) {
+                Log.w(TAG, "manual update check failed", e);
+                runOnUiThread(() -> {
+                    checkDownloadsForTerminalStates(false);
+                    renderSlots();
+                    renderAppUpdateBanner();
+                    resetManualUpdateButton();
+                    Log.d(TAG, "manual update check finished");
+                    Toast.makeText(this, "Не удалось проверить обновления, используется сохранённая информация", Toast.LENGTH_SHORT).show();
+                });
+            }
+        }, "TGSpacesManualUpdateCheck").start();
+    }
+
+    private void resetManualUpdateButton() {
+        if (manualUpdateButton == null) {
+            return;
+        }
+        manualUpdateButton.setEnabled(true);
+        manualUpdateButton.setText("Проверить обновления");
+    }
+
     private void loadAppCatalog() {
         new Thread(() -> {
-            HttpURLConnection connection = null;
             try {
-                URL url = new URL(APP_CATALOG_URL);
-                connection = (HttpURLConnection) url.openConnection();
-                connection.setConnectTimeout(8000);
-                connection.setReadTimeout(8000);
-                connection.setRequestMethod("GET");
-
-                int responseCode = connection.getResponseCode();
-                if (responseCode < 200 || responseCode >= 300) {
-                    throw new IllegalStateException("HTTP " + responseCode);
-                }
-
-                StringBuilder body = new StringBuilder();
-                try (BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        body.append(line);
-                    }
-                }
-
-                AppUpdateInfo loadedAppUpdateInfo = parseAppUpdateInfo(body.toString());
+                AppUpdateInfo loadedAppUpdateInfo = parseAppUpdateInfo(downloadText(APP_CATALOG_URL));
                 runOnUiThread(() -> {
                     appUpdateInfo = loadedAppUpdateInfo;
                     renderAppUpdateBanner();
                 });
             } catch (Exception e) {
                 Log.w(TAG, "TGSpaces app catalog load failed, app update check skipped", e);
-            } finally {
-                if (connection != null) {
-                    connection.disconnect();
-                }
             }
         }, "TGSpacesAppCatalogLoader").start();
+    }
+
+    private String downloadText(String urlText) throws Exception {
+        HttpURLConnection connection = null;
+        try {
+            URL url = new URL(urlText);
+            connection = (HttpURLConnection) url.openConnection();
+            connection.setConnectTimeout(8000);
+            connection.setReadTimeout(8000);
+            connection.setRequestMethod("GET");
+
+            int responseCode = connection.getResponseCode();
+            if (responseCode < 200 || responseCode >= 300) {
+                throw new IllegalStateException("HTTP " + responseCode);
+            }
+
+            StringBuilder body = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    body.append(line);
+                }
+            }
+            return body.toString();
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
     }
 
     private AppUpdateInfo parseAppUpdateInfo(String json) throws Exception {
@@ -619,10 +677,26 @@ public class MainActivity extends AppCompatActivity {
                     + ", remoteVersionCode=" + appUpdateInfo.versionCode);
             appUpdateText.setText("Текущая версия: " + versionText(installedAppInfo.versionName)
                     + "\nНовая версия: " + versionText(appUpdateInfo.versionName));
+            updateAppUpdateButtonState();
             appUpdateBanner.setVisibility(View.VISIBLE);
         } else {
             Log.d(TAG, "No TGSpaces update available");
             appUpdateBanner.setVisibility(View.GONE);
+        }
+    }
+
+    private void updateAppUpdateButtonState() {
+        if (appUpdateButton == null) {
+            return;
+        }
+
+        long activeDownload = preferences.getLong(KEY_APP_UPDATE_DOWNLOAD_ID, -1L);
+        if (activeDownload > 0 && isDownloadActive(activeDownload)) {
+            appUpdateButton.setEnabled(false);
+            appUpdateButton.setText("Скачивается...");
+        } else {
+            appUpdateButton.setEnabled(true);
+            appUpdateButton.setText("Скачать обновление");
         }
     }
 
@@ -647,8 +721,14 @@ public class MainActivity extends AppCompatActivity {
 
         long activeDownload = preferences.getLong(KEY_APP_UPDATE_DOWNLOAD_ID, -1L);
         if (activeDownload > 0 && isDownloadActive(activeDownload)) {
+            Log.d(TAG, "tgspaces update download already running");
+            updateAppUpdateButtonState();
             Toast.makeText(this, "Обновление TGSpaces уже скачивается", Toast.LENGTH_SHORT).show();
             return;
+        }
+
+        if (preferences.getBoolean(KEY_APP_UPDATE_DOWNLOAD_FAILED, false)) {
+            Log.d(TAG, "tgspaces update retry");
         }
 
         File downloadsDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
@@ -677,11 +757,20 @@ public class MainActivity extends AppCompatActivity {
         preferences.edit()
                 .putLong(KEY_APP_UPDATE_DOWNLOAD_ID, downloadId)
                 .remove(KEY_APP_UPDATE_APK_PATH)
+                .remove(KEY_APP_UPDATE_DOWNLOAD_FAILED)
                 .apply();
+        updateAppUpdateButtonState();
         Toast.makeText(this, "Скачивание обновления началось", Toast.LENGTH_SHORT).show();
     }
 
     private void downloadCloneApk(int slot) {
+        long activeDownload = preferences.getLong(slotDownloadKey(slot), -1L);
+        if (activeDownload > 0 && isDownloadActive(activeDownload)) {
+            Toast.makeText(this, "APK для этого слота уже скачивается", Toast.LENGTH_SHORT).show();
+            renderSlots();
+            return;
+        }
+
         File downloadsDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
         if (downloadsDir == null) {
             showDownloadError(slot, "Недоступна папка загрузок приложения");
@@ -720,6 +809,48 @@ public class MainActivity extends AppCompatActivity {
                 .apply();
         Toast.makeText(this, "Скачивание началось", Toast.LENGTH_SHORT).show();
         renderSlots();
+    }
+
+    private void cancelCloneDownload(int slot) {
+        long downloadId = preferences.getLong(slotDownloadKey(slot), -1L);
+        if (downloadId > 0) {
+            DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+            manager.remove(downloadId);
+            downloadSlots.remove(downloadId);
+        }
+
+        clearSlotDownload(slot);
+        Log.d(TAG, "clone download canceled: slot=" + slot + ", downloadId=" + downloadId);
+        Toast.makeText(this, "Загрузка отменена", Toast.LENGTH_SHORT).show();
+        renderSlots();
+    }
+
+    private void retryCloneDownload(int slot) {
+        Log.d(TAG, "clone download retry: slot=" + slot);
+        preferences.edit().remove(slotErrorKey(slot)).apply();
+        downloadCloneApk(slot);
+    }
+
+    private void restartCloneDownload(int slot) {
+        long downloadId = getKnownDownloadId(slot);
+        if (downloadId > 0) {
+            DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+            manager.remove(downloadId);
+            downloadSlots.remove(downloadId);
+        }
+
+        String pendingPath = preferences.getString(KEY_PENDING_APK, null);
+        if (preferences.getInt(KEY_PENDING_SLOT, 0) == slot && pendingPath != null) {
+            File pendingFile = new File(pendingPath);
+            if (pendingFile.exists() && !pendingFile.delete()) {
+                Log.w(TAG, "Could not delete pending clone APK before restart: slot=" + slot + ", path=" + pendingPath);
+            }
+        }
+
+        clearPendingCloneInstall(slot);
+        clearSlotDownload(slot);
+        Log.d(TAG, "clone download restarted: slot=" + slot + ", previousDownloadId=" + downloadId);
+        downloadCloneApk(slot);
     }
 
     private void handleDownloadedApk(long downloadId, int slot, boolean autoOpen) {
@@ -802,7 +933,9 @@ public class MainActivity extends AppCompatActivity {
             preferences.edit()
                     .remove(KEY_APP_UPDATE_DOWNLOAD_ID)
                     .remove(KEY_APP_UPDATE_APK_PATH)
+                    .putBoolean(KEY_APP_UPDATE_DOWNLOAD_FAILED, true)
                     .apply();
+            renderAppUpdateBanner();
         }
     }
 
@@ -820,7 +953,9 @@ public class MainActivity extends AppCompatActivity {
             preferences.edit()
                     .remove(KEY_APP_UPDATE_DOWNLOAD_ID)
                     .remove(KEY_APP_UPDATE_APK_PATH)
+                    .putBoolean(KEY_APP_UPDATE_DOWNLOAD_FAILED, true)
                     .apply();
+            renderAppUpdateBanner();
             return;
         }
 
@@ -830,7 +965,9 @@ public class MainActivity extends AppCompatActivity {
             preferences.edit()
                     .remove(KEY_APP_UPDATE_DOWNLOAD_ID)
                     .remove(KEY_APP_UPDATE_APK_PATH)
+                    .putBoolean(KEY_APP_UPDATE_DOWNLOAD_FAILED, true)
                     .apply();
+            renderAppUpdateBanner();
             return;
         }
 
@@ -842,7 +979,9 @@ public class MainActivity extends AppCompatActivity {
             preferences.edit()
                     .remove(KEY_APP_UPDATE_DOWNLOAD_ID)
                     .remove(KEY_APP_UPDATE_APK_PATH)
+                    .putBoolean(KEY_APP_UPDATE_DOWNLOAD_FAILED, true)
                     .apply();
+            renderAppUpdateBanner();
             new AlertDialog.Builder(this)
                     .setTitle("Ошибка загрузки")
                     .setMessage("SHA-256 скачанного обновления TGSpaces не совпадает с каталогом. Установщик не будет открыт.")
@@ -854,7 +993,9 @@ public class MainActivity extends AppCompatActivity {
         preferences.edit()
                 .putString(KEY_APP_UPDATE_APK_PATH, apkFile.getAbsolutePath())
                 .remove(KEY_APP_UPDATE_DOWNLOAD_ID)
+                .remove(KEY_APP_UPDATE_DOWNLOAD_FAILED)
                 .apply();
+        renderAppUpdateBanner();
 
         if (autoOpen) {
             openAppUpdateInstaller(apkFile);
@@ -1096,7 +1237,27 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void clearSlotDownload(int slot) {
-        preferences.edit().remove(slotDownloadKey(slot)).apply();
+        long downloadId = preferences.getLong(slotDownloadKey(slot), -1L);
+        SharedPreferences.Editor editor = preferences.edit().remove(slotDownloadKey(slot));
+        if (downloadId > 0) {
+            editor.remove(downloadSlotKey(downloadId));
+            downloadSlots.remove(downloadId);
+        }
+        editor.apply();
+    }
+
+    private void clearPendingCloneInstall(int slot) {
+        if (preferences.getInt(KEY_PENDING_SLOT, 0) != slot) {
+            return;
+        }
+
+        preferences.edit()
+                .remove(KEY_PENDING_APK)
+                .remove(KEY_PENDING_SLOT)
+                .remove(KEY_PENDING_DOWNLOAD_ID)
+                .remove(slotAutoOpenedKey(slot))
+                .remove(slotInstallNoticeKey(slot))
+                .apply();
     }
 
     private void logDownloadProblem(int slot, long downloadId, String uriOrPath, int status, int reason) {
@@ -1205,29 +1366,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void loadCloneCatalog() {
         new Thread(() -> {
-            HttpURLConnection connection = null;
             try {
-                URL url = new URL(CATALOG_URL);
-                connection = (HttpURLConnection) url.openConnection();
-                connection.setConnectTimeout(8000);
-                connection.setReadTimeout(8000);
-                connection.setRequestMethod("GET");
-
-                int responseCode = connection.getResponseCode();
-                if (responseCode < 200 || responseCode >= 300) {
-                    throw new IllegalStateException("HTTP " + responseCode);
-                }
-
-                StringBuilder body = new StringBuilder();
-                try (BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        body.append(line);
-                    }
-                }
-
-                Map<Integer, CloneInfo> loadedCatalog = parseCloneCatalog(body.toString());
+                Map<Integer, CloneInfo> loadedCatalog = parseCloneCatalog(downloadText(CATALOG_URL));
                 runOnUiThread(() -> {
                     cloneCatalog.clear();
                     cloneCatalog.putAll(loadedCatalog);
@@ -1236,10 +1376,6 @@ public class MainActivity extends AppCompatActivity {
                 });
             } catch (Exception e) {
                 Log.w(TAG, "Clone catalog load failed, using fallback clone URLs", e);
-            } finally {
-                if (connection != null) {
-                    connection.disconnect();
-                }
             }
         }, "TGSpacesCatalogLoader").start();
     }
