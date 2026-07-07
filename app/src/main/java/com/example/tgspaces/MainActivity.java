@@ -84,10 +84,10 @@ public class MainActivity extends AppCompatActivity {
     private static final String KEY_APP_UPDATE_APK_PATH = "app_update_apk_path";
     private static final String KEY_APP_UPDATE_DOWNLOAD_FAILED = "app_update_download_failed";
     private static final String KEY_SETTINGS_CATALOG_REFRESHED = "settings_catalog_refreshed";
-    private static final int MAX_CLONE_APKS = 10;
+    private static final int MAX_CLONE_APKS = 20;
     private static final String CATALOG_URL = "https://raw.githubusercontent.com/DesperadoBoi/TGSpaces/main/catalog/clones.json";
     private static final String APP_CATALOG_URL = "https://raw.githubusercontent.com/DesperadoBoi/TGSpaces/main/catalog/app.json";
-    private static final String RELEASE_BASE_URL = "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.2-release/";
+    private static final String RELEASE_BASE_URL = "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.3-release/";
     private static final long PROGRESS_REFRESH_MS = 1200L;
 
     private final Map<Long, Integer> downloadSlots = new HashMap<>();

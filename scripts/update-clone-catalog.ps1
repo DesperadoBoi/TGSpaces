@@ -1,5 +1,5 @@
 param(
-    [string]$ReleaseTag = "v0.2-release",
+    [string]$ReleaseTag = "v0.3-release",
     [string]$TelegramBasePath = "D:\Projects\TelegramClones\TelegramBase"
 )
 
@@ -75,7 +75,7 @@ if (-not (Test-Path -LiteralPath $releaseApksPath)) {
 $aaptPath = Get-LatestAapt
 $clones = @()
 
-foreach ($slot in 1..10) {
+foreach ($slot in 1..20) {
     $slotText = "{0:D2}" -f $slot
     $apkFileName = "TGClone$slotText-release.apk"
     $apkPath = Join-Path $releaseApksPath $apkFileName
@@ -92,6 +92,7 @@ foreach ($slot in 1..10) {
 
     $clones += [ordered]@{
         slot = $slot
+        slotNumber = $slot
         name = "TGClone $slotText"
         packageName = $badging.PackageName
         apkFileName = $apkFileName

@@ -56,7 +56,7 @@ public class SettingsActivity extends AppCompatActivity {
     private static final String THEME_MODE_DARK = "dark";
     private static final String CATALOG_URL = "https://raw.githubusercontent.com/DesperadoBoi/TGSpaces/main/catalog/clones.json";
     private static final String APP_CATALOG_URL = "https://raw.githubusercontent.com/DesperadoBoi/TGSpaces/main/catalog/app.json";
-    private static final int MAX_CLONE_APKS = 10;
+    private static final int MAX_CLONE_APKS = 20;
 
     private SharedPreferences preferences;
     private View checkUpdatesRow;

@@ -16,6 +16,16 @@
         <package android:name="com.desperadoboi.tgclone08" />
         <package android:name="com.desperadoboi.tgclone09" />
         <package android:name="com.desperadoboi.tgclone10" />
+        <package android:name="com.desperadoboi.tgclone11" />
+        <package android:name="com.desperadoboi.tgclone12" />
+        <package android:name="com.desperadoboi.tgclone13" />
+        <package android:name="com.desperadoboi.tgclone14" />
+        <package android:name="com.desperadoboi.tgclone15" />
+        <package android:name="com.desperadoboi.tgclone16" />
+        <package android:name="com.desperadoboi.tgclone17" />
+        <package android:name="com.desperadoboi.tgclone18" />
+        <package android:name="com.desperadoboi.tgclone19" />
+        <package android:name="com.desperadoboi.tgclone20" />
     </queries>
 
     <application

@@ -1,106 +1,226 @@
 ﻿{
     "catalogVersion":  1,
-    "releaseTag":  "v0.2-release",
+    "releaseTag":  "v0.3-release",
     "clones":  [
                    {
                        "slot":  1,
+                       "slotNumber":  1,
                        "name":  "TGClone 01",
                        "packageName":  "com.desperadoboi.tgclone01",
                        "apkFileName":  "TGClone01-release.apk",
-                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.2-release/TGClone01-release.apk",
+                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.3-release/TGClone01-release.apk",
                        "versionName":  "12.8.1",
                        "versionCode":  69169,
-                       "sha256":  "5f97261a75b67023c442e1120c89311eb7369de70f6106598ea40ad6e176b167"
+                       "sha256":  "7b50444d14f4768cbac9b14e4fddce0e5d9529024428b57b67b31f3b64aea403"
                    },
                    {
                        "slot":  2,
+                       "slotNumber":  2,
                        "name":  "TGClone 02",
                        "packageName":  "com.desperadoboi.tgclone02",
                        "apkFileName":  "TGClone02-release.apk",
-                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.2-release/TGClone02-release.apk",
+                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.3-release/TGClone02-release.apk",
                        "versionName":  "12.8.1",
                        "versionCode":  69169,
-                       "sha256":  "3d28abfc2825c6933cb626a29d9fb1159e86199e3cbf028245eb3981b263a832"
+                       "sha256":  "47d0c44e31e05bdb89d73c38f3b16b0b4511b814ffa412efff9f4a17908dcf29"
                    },
                    {
                        "slot":  3,
+                       "slotNumber":  3,
                        "name":  "TGClone 03",
                        "packageName":  "com.desperadoboi.tgclone03",
                        "apkFileName":  "TGClone03-release.apk",
-                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.2-release/TGClone03-release.apk",
+                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.3-release/TGClone03-release.apk",
                        "versionName":  "12.8.1",
                        "versionCode":  69169,
-                       "sha256":  "6b20e42554a7a51d52291fc47bb37b11edd0f51a3adcc88e4e902ee0660056b2"
+                       "sha256":  "324108922a62d793f7a81dffa61dc5dc1c45d00cf92288f9482f8dddd5e86684"
                    },
                    {
                        "slot":  4,
+                       "slotNumber":  4,
                        "name":  "TGClone 04",
                        "packageName":  "com.desperadoboi.tgclone04",
                        "apkFileName":  "TGClone04-release.apk",
-                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.2-release/TGClone04-release.apk",
+                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.3-release/TGClone04-release.apk",
                        "versionName":  "12.8.1",
                        "versionCode":  69169,
-                       "sha256":  "c79a11ef4af7f9958eff153b52516cbfcc50d3cddc13a41c9dcb5c5d6300a38d"
+                       "sha256":  "61be04f982f17b1792455cdaf260d50fa8e64538b4fa47d0948f98c954569c42"
                    },
                    {
                        "slot":  5,
+                       "slotNumber":  5,
                        "name":  "TGClone 05",
                        "packageName":  "com.desperadoboi.tgclone05",
                        "apkFileName":  "TGClone05-release.apk",
-                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.2-release/TGClone05-release.apk",
+                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.3-release/TGClone05-release.apk",
                        "versionName":  "12.8.1",
                        "versionCode":  69169,
-                       "sha256":  "6a2bad76564fb015dc51870d553931d87c40499e84fa145be7839cb4f0794c4c"
+                       "sha256":  "c11b89d59b469063d56cacb5187394f91949c9820182a668efab43d6cd0a0948"
                    },
                    {
                        "slot":  6,
+                       "slotNumber":  6,
                        "name":  "TGClone 06",
                        "packageName":  "com.desperadoboi.tgclone06",
                        "apkFileName":  "TGClone06-release.apk",
-                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.2-release/TGClone06-release.apk",
+                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.3-release/TGClone06-release.apk",
                        "versionName":  "12.8.1",
                        "versionCode":  69169,
-                       "sha256":  "10682e9500d24661bc4182e6253d60724af0e603fc7d6781ec12a13b78f8f65d"
+                       "sha256":  "e592fd6d4b3fea14a692446d495378139f0f486a81f5e10eb92961181d16dc77"
                    },
                    {
                        "slot":  7,
+                       "slotNumber":  7,
                        "name":  "TGClone 07",
                        "packageName":  "com.desperadoboi.tgclone07",
                        "apkFileName":  "TGClone07-release.apk",
-                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.2-release/TGClone07-release.apk",
+                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.3-release/TGClone07-release.apk",
                        "versionName":  "12.8.1",
                        "versionCode":  69169,
-                       "sha256":  "d017cb722d9e688de842adc6d7377b2fdd4e54a66f741fec631b4cf997c1df99"
+                       "sha256":  "3fd217c1f9665f1d659e95b885eadacc5cb804709bdbb56206989c4354a181e4"
                    },
                    {
                        "slot":  8,
+                       "slotNumber":  8,
                        "name":  "TGClone 08",
                        "packageName":  "com.desperadoboi.tgclone08",
                        "apkFileName":  "TGClone08-release.apk",
-                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.2-release/TGClone08-release.apk",
+                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.3-release/TGClone08-release.apk",
                        "versionName":  "12.8.1",
                        "versionCode":  69169,
-                       "sha256":  "c66a5da202de3df6ccce330e6e41c76932c81fd36448e605b705c9f062d840f1"
+                       "sha256":  "ca908a4e8d7bcdb78f2f8581339cd15ec5adfa1a4c58a6ee93351a306fc7c0d9"
                    },
                    {
                        "slot":  9,
+                       "slotNumber":  9,
                        "name":  "TGClone 09",
                        "packageName":  "com.desperadoboi.tgclone09",
                        "apkFileName":  "TGClone09-release.apk",
-                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.2-release/TGClone09-release.apk",
+                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.3-release/TGClone09-release.apk",
                        "versionName":  "12.8.1",
                        "versionCode":  69169,
-                       "sha256":  "cfed25181af423d6e9a73c9870c381829a2b6eddddafa26e1930b3a566901978"
+                       "sha256":  "35804821e7619b772b263594ec5388cd6e06a6cdaf4dbea28ebc5ea320877203"
                    },
                    {
                        "slot":  10,
+                       "slotNumber":  10,
                        "name":  "TGClone 10",
                        "packageName":  "com.desperadoboi.tgclone10",
                        "apkFileName":  "TGClone10-release.apk",
-                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.2-release/TGClone10-release.apk",
+                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.3-release/TGClone10-release.apk",
                        "versionName":  "12.8.1",
                        "versionCode":  69169,
-                       "sha256":  "09a0b2b6ccf6b00944329f7263963e785981ae72100a4b295ffc58d57b13b01d"
+                       "sha256":  "f3eb283190d7037668619c435d3fea1a262ce729c792259241876b043499b02a"
+                   },
+                   {
+                       "slot":  11,
+                       "slotNumber":  11,
+                       "name":  "TGClone 11",
+                       "packageName":  "com.desperadoboi.tgclone11",
+                       "apkFileName":  "TGClone11-release.apk",
+                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.3-release/TGClone11-release.apk",
+                       "versionName":  "12.8.1",
+                       "versionCode":  69169,
+                       "sha256":  "df388e6c18602e525f907626199ed503060d242d48e798c9ad0f3eeeafeedb52"
+                   },
+                   {
+                       "slot":  12,
+                       "slotNumber":  12,
+                       "name":  "TGClone 12",
+                       "packageName":  "com.desperadoboi.tgclone12",
+                       "apkFileName":  "TGClone12-release.apk",
+                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.3-release/TGClone12-release.apk",
+                       "versionName":  "12.8.1",
+                       "versionCode":  69169,
+                       "sha256":  "bcd13a75fdafd318c83d5b54339757d7b4d3f85944e9c4ff8cc62572ea613cd7"
+                   },
+                   {
+                       "slot":  13,
+                       "slotNumber":  13,
+                       "name":  "TGClone 13",
+                       "packageName":  "com.desperadoboi.tgclone13",
+                       "apkFileName":  "TGClone13-release.apk",
+                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.3-release/TGClone13-release.apk",
+                       "versionName":  "12.8.1",
+                       "versionCode":  69169,
+                       "sha256":  "7feed1cac8607d3510ce7d105d36c8b0ef50e2bace39360635857b6384a966b8"
+                   },
+                   {
+                       "slot":  14,
+                       "slotNumber":  14,
+                       "name":  "TGClone 14",
+                       "packageName":  "com.desperadoboi.tgclone14",
+                       "apkFileName":  "TGClone14-release.apk",
+                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.3-release/TGClone14-release.apk",
+                       "versionName":  "12.8.1",
+                       "versionCode":  69169,
+                       "sha256":  "47ee22ea0f2c8d376cd0c4f67ee0c4331713056169854a3b56055c248f394eff"
+                   },
+                   {
+                       "slot":  15,
+                       "slotNumber":  15,
+                       "name":  "TGClone 15",
+                       "packageName":  "com.desperadoboi.tgclone15",
+                       "apkFileName":  "TGClone15-release.apk",
+                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.3-release/TGClone15-release.apk",
+                       "versionName":  "12.8.1",
+                       "versionCode":  69169,
+                       "sha256":  "137e4128f5df20fc5f9ca98939775c01024172fe1011242571e09d4fe3c03d5e"
+                   },
+                   {
+                       "slot":  16,
+                       "slotNumber":  16,
+                       "name":  "TGClone 16",
+                       "packageName":  "com.desperadoboi.tgclone16",
+                       "apkFileName":  "TGClone16-release.apk",
+                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.3-release/TGClone16-release.apk",
+                       "versionName":  "12.8.1",
+                       "versionCode":  69169,
+                       "sha256":  "d9b3e44243ef43e7eae436e969fd56db72cdea824537b387ffb0248b6baa99ce"
+                   },
+                   {
+                       "slot":  17,
+                       "slotNumber":  17,
+                       "name":  "TGClone 17",
+                       "packageName":  "com.desperadoboi.tgclone17",
+                       "apkFileName":  "TGClone17-release.apk",
+                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.3-release/TGClone17-release.apk",
+                       "versionName":  "12.8.1",
+                       "versionCode":  69169,
+                       "sha256":  "577168c34fab2983947a3dc3a89c88d1d2d43d9b78eb90b73a34fb988406a3dd"
+                   },
+                   {
+                       "slot":  18,
+                       "slotNumber":  18,
+                       "name":  "TGClone 18",
+                       "packageName":  "com.desperadoboi.tgclone18",
+                       "apkFileName":  "TGClone18-release.apk",
+                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.3-release/TGClone18-release.apk",
+                       "versionName":  "12.8.1",
+                       "versionCode":  69169,
+                       "sha256":  "769f1cde74f7c7729e8e29cc38dbb1b9da5232094ef7ec8ebaae08279e6a8abc"
+                   },
+                   {
+                       "slot":  19,
+                       "slotNumber":  19,
+                       "name":  "TGClone 19",
+                       "packageName":  "com.desperadoboi.tgclone19",
+                       "apkFileName":  "TGClone19-release.apk",
+                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.3-release/TGClone19-release.apk",
+                       "versionName":  "12.8.1",
+                       "versionCode":  69169,
+                       "sha256":  "196e8e1ff1305ce986b5e1c3a9a32ff9954ad520a2128e31a2796b4191dde027"
+                   },
+                   {
+                       "slot":  20,
+                       "slotNumber":  20,
+                       "name":  "TGClone 20",
+                       "packageName":  "com.desperadoboi.tgclone20",
+                       "apkFileName":  "TGClone20-release.apk",
+                       "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.3-release/TGClone20-release.apk",
+                       "versionName":  "12.8.1",
+                       "versionCode":  69169,
+                       "sha256":  "54cbc03febcebe5723158fd7b38737fe3ff58b48726d9385daf780e695e1a19f"
                    }
                ]
 }

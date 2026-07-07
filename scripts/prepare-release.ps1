@@ -51,7 +51,7 @@ function Get-CloneApkPaths {
     param([string]$ReleaseApksPath)
 
     $paths = @()
-    foreach ($slot in 1..10) {
+    foreach ($slot in 1..20) {
         $slotText = "{0:D2}" -f $slot
         $apkPath = Join-Path $ReleaseApksPath "TGClone$slotText-release.apk"
         Assert-FileExists -Path $apkPath -Description "Clone release APK"
