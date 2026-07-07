@@ -232,8 +232,8 @@ public class MainActivity extends AppCompatActivity {
         }
         if (preferences.getBoolean(KEY_SETTINGS_CATALOG_REFRESHED, false)) {
             preferences.edit().remove(KEY_SETTINGS_CATALOG_REFRESHED).apply();
-            loadCloneCatalog();
-            loadAppCatalog();
+            loadCloneCatalog(true);
+            loadAppCatalog(true);
         }
         checkDownloadsForTerminalStates(false);
         checkAppUpdateDownload(true);
@@ -1396,9 +1396,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void loadAppCatalog() {
+        loadAppCatalog(false);
+    }
+
+    private void loadAppCatalog(boolean forceRefresh) {
         new Thread(() -> {
             try {
-                AppUpdateInfo loadedAppUpdateInfo = parseAppUpdateInfo(downloadText(APP_CATALOG_URL));
+                AppUpdateInfo loadedAppUpdateInfo = parseAppUpdateInfo(downloadText(APP_CATALOG_URL, forceRefresh));
                 runOnUiThread(() -> {
                     appUpdateInfo = loadedAppUpdateInfo;
                     renderAppUpdateBanner();
@@ -1410,13 +1414,24 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private String downloadText(String urlText) throws Exception {
+        return downloadText(urlText, false);
+    }
+
+    private String downloadText(String urlText, boolean forceRefresh) throws Exception {
         HttpURLConnection connection = null;
         try {
-            URL url = new URL(urlText);
+            String requestUrl = forceRefresh ? cacheBustedUrl(urlText) : urlText;
+            Log.d(TAG, "HTTP GET catalog: url=" + urlText + ", forceRefresh=" + forceRefresh);
+            URL url = new URL(requestUrl);
             connection = (HttpURLConnection) url.openConnection();
             connection.setConnectTimeout(8000);
             connection.setReadTimeout(8000);
             connection.setRequestMethod("GET");
+            if (forceRefresh) {
+                connection.setUseCaches(false);
+                connection.setRequestProperty("Cache-Control", "no-cache");
+                connection.setRequestProperty("Pragma", "no-cache");
+            }
 
             int responseCode = connection.getResponseCode();
             if (responseCode < 200 || responseCode >= 300) {
@@ -1437,6 +1452,11 @@ public class MainActivity extends AppCompatActivity {
                 connection.disconnect();
             }
         }
+    }
+
+    private static String cacheBustedUrl(String urlText) {
+        String separator = urlText.contains("?") ? "&" : "?";
+        return urlText + separator + "t=" + System.currentTimeMillis();
     }
 
     private AppUpdateInfo parseAppUpdateInfo(String json) throws Exception {
@@ -2153,9 +2173,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void loadCloneCatalog() {
+        loadCloneCatalog(false);
+    }
+
+    private void loadCloneCatalog(boolean forceRefresh) {
         new Thread(() -> {
             try {
-                Map<Integer, CloneInfo> loadedCatalog = parseCloneCatalog(downloadText(CATALOG_URL));
+                Map<Integer, CloneInfo> loadedCatalog = parseCloneCatalog(downloadText(CATALOG_URL, forceRefresh));
                 runOnUiThread(() -> {
                     cloneCatalog.clear();
                     cloneCatalog.putAll(loadedCatalog);

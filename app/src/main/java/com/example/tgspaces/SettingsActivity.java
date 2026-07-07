@@ -376,14 +376,21 @@ public class SettingsActivity extends AppCompatActivity {
 
         Log.d(TAG, "manual update check started");
         checkUpdatesRow.setEnabled(false);
-        checkUpdatesLabel.setText("Проверяем...");
+        checkUpdatesLabel.setText("Проверяем обновления...");
 
         new Thread(() -> {
             try {
-                String clonesJson = downloadText(CATALOG_URL);
-                String appJson = downloadText(APP_CATALOG_URL);
+                String clonesJson = downloadText(CATALOG_URL, true);
+                String appJson = downloadText(APP_CATALOG_URL, true);
                 String catalogLabel = parseCloneCatalogLabel(clonesJson);
-                validateAppCatalog(appJson);
+                AppCatalogCheck appCatalogCheck = parseAppCatalogCheck(appJson);
+                long localVersionCode = installedAppVersionCode();
+                boolean appUpdateAvailable = appCatalogCheck.versionCode > localVersionCode;
+                Log.d(TAG, "manual TGSpaces update check result: localVersionCode=" + localVersionCode
+                        + ", remoteVersionCode=" + appCatalogCheck.versionCode
+                        + ", updateAvailable=" + appUpdateAvailable
+                        + ", appCatalogUrl=" + APP_CATALOG_URL
+                        + ", cloneCatalogUrl=" + CATALOG_URL);
 
                 runOnUiThread(() -> {
                     preferences.edit()
@@ -391,16 +398,20 @@ public class SettingsActivity extends AppCompatActivity {
                             .putString(KEY_SETTINGS_CATALOG_LABEL, catalogLabel)
                             .apply();
                     updateVersionText();
-                    resetCheckUpdatesButton();
+                    checkUpdatesRow.setEnabled(true);
+                    checkUpdatesLabel.setText(appUpdateAvailable ? "Обновление найдено" : "Обновлений нет");
                     Log.d(TAG, "manual update check finished");
-                    Toast.makeText(this, "Обновления проверены", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this,
+                            appUpdateAvailable ? "Обновление найдено" : "Обновлений нет",
+                            Toast.LENGTH_SHORT).show();
                 });
             } catch (Exception e) {
                 Log.w(TAG, "manual update check failed", e);
                 runOnUiThread(() -> {
-                    resetCheckUpdatesButton();
+                    checkUpdatesRow.setEnabled(true);
+                    checkUpdatesLabel.setText("Не удалось проверить обновления");
                     Log.d(TAG, "manual update check finished");
-                    Toast.makeText(this, "Не удалось проверить обновления, используется сохранённая информация", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Не удалось проверить обновления", Toast.LENGTH_SHORT).show();
                 });
             }
         }, "TGSpacesSettingsUpdateCheck").start();
@@ -412,13 +423,24 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private String downloadText(String urlText) throws Exception {
+        return downloadText(urlText, false);
+    }
+
+    private String downloadText(String urlText, boolean forceRefresh) throws Exception {
         HttpURLConnection connection = null;
         try {
-            URL url = new URL(urlText);
+            String requestUrl = forceRefresh ? cacheBustedUrl(urlText) : urlText;
+            Log.d(TAG, "HTTP GET catalog: url=" + urlText + ", forceRefresh=" + forceRefresh);
+            URL url = new URL(requestUrl);
             connection = (HttpURLConnection) url.openConnection();
             connection.setConnectTimeout(8000);
             connection.setReadTimeout(8000);
             connection.setRequestMethod("GET");
+            if (forceRefresh) {
+                connection.setUseCaches(false);
+                connection.setRequestProperty("Cache-Control", "no-cache");
+                connection.setRequestProperty("Pragma", "no-cache");
+            }
 
             int responseCode = connection.getResponseCode();
             if (responseCode < 200 || responseCode >= 300) {
@@ -441,6 +463,11 @@ public class SettingsActivity extends AppCompatActivity {
         }
     }
 
+    private static String cacheBustedUrl(String urlText) {
+        String separator = urlText.contains("?") ? "&" : "?";
+        return urlText + separator + "t=" + System.currentTimeMillis();
+    }
+
     private String parseCloneCatalogLabel(String json) throws Exception {
         JSONObject root = new JSONObject(json);
         JSONArray clones = root.getJSONArray("clones");
@@ -458,12 +485,24 @@ public class SettingsActivity extends AppCompatActivity {
         return "проверен";
     }
 
-    private void validateAppCatalog(String json) throws Exception {
+    private AppCatalogCheck parseAppCatalogCheck(String json) throws Exception {
         JSONObject root = new JSONObject(json);
         String packageName = root.getString("packageName").trim();
         if (!getPackageName().equals(packageName)) {
             throw new IllegalArgumentException("Unexpected TGSpaces packageName: " + packageName);
         }
+        return new AppCatalogCheck(
+                root.optString("versionName", ""),
+                root.getLong("versionCode")
+        );
+    }
+
+    private long installedAppVersionCode() throws Exception {
+        PackageInfo packageInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            return packageInfo.getLongVersionCode();
+        }
+        return packageInfo.versionCode;
     }
 
     private void showWhatIsSlotDialog() {
@@ -530,6 +569,16 @@ public class SettingsActivity extends AppCompatActivity {
 
     private static String slotAutoOpenedKey(int slot) {
         return KEY_SLOT_AUTO_OPENED_PREFIX + slot;
+    }
+
+    private static class AppCatalogCheck {
+        final String versionName;
+        final long versionCode;
+
+        AppCatalogCheck(String versionName, long versionCode) {
+            this.versionName = versionName;
+            this.versionCode = versionCode;
+        }
     }
 
     private static class CleanupResult {
