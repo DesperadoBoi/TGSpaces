@@ -2,9 +2,9 @@
     "appName":  "TGSpaces",
     "packageName":  "com.example.tgspaces",
     "releaseTag":  "v0.3-release",
-    "apkFileName":  "TGSpaces-release.apk",
-    "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.3-release/TGSpaces-release.apk",
+    "apkFileName":  "TGSpaces-0.3.0-release.apk",
+    "apkUrl":  "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.3-release/TGSpaces-0.3.0-release.apk",
     "versionName":  "0.3.0",
     "versionCode":  3,
-    "sha256":  "142d817e8f3332ec860cbb2a927bee96a9c90b348409ecb2215892e4578cc3af"
+    "sha256":  "2b363e13771bfdd142b50f6c052116c2eddfe8da2ab5150f07b076038554132d"
 }
