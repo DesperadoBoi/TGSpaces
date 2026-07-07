@@ -71,6 +71,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String KEY_SLOT_ERROR_PREFIX = "slot_error_";
     private static final String KEY_SLOT_AUTO_OPENED_PREFIX = "slot_auto_opened_";
     private static final String KEY_SLOT_HIDDEN_PREFIX = "slot_hidden_";
+    private static final String KEY_SLOT_VISIBILITY_INITIALIZED = "slot_visibility_initialized";
     static final String KEY_ONBOARDING_SEEN = "onboarding_seen";
     static final String EXTRA_SHOW_ONBOARDING = "show_onboarding";
     private static final String KEY_DISPLAY_MODE_COMPACT = "display_mode_compact";
@@ -247,8 +248,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void renderSlots() {
+        ensureSlotVisibilityInitialized();
         int savedSlotCount = Math.max(1, preferences.getInt(KEY_SLOT_COUNT, 1));
-        visibleSlotCount = Math.min(MAX_CLONE_APKS, Math.max(savedSlotCount, highestRequiredSlot()));
+        visibleSlotCount = Math.min(MAX_CLONE_APKS, Math.max(savedSlotCount, nextRequiredSlotCount()));
         if (visibleSlotCount != savedSlotCount) {
             preferences.edit().putInt(KEY_SLOT_COUNT, visibleSlotCount).apply();
         }
@@ -1211,6 +1213,36 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         return highest;
+    }
+
+    private int nextRequiredSlotCount() {
+        int highest = highestRequiredSlot();
+        if (highest <= 0) {
+            return 1;
+        }
+        return Math.min(MAX_CLONE_APKS, highest + 1);
+    }
+
+    private void ensureSlotVisibilityInitialized() {
+        if (preferences.getBoolean(KEY_SLOT_VISIBILITY_INITIALIZED, false)) {
+            return;
+        }
+
+        int initialSlotCount = nextRequiredSlotCount();
+        SharedPreferences.Editor editor = preferences.edit()
+                .putBoolean(KEY_SLOT_VISIBILITY_INITIALIZED, true)
+                .putInt(KEY_SLOT_COUNT, initialSlotCount);
+
+        if (highestRequiredSlot() > 0) {
+            for (int slot = 1; slot < initialSlotCount; slot++) {
+                if (!isSlotRequired(slot)) {
+                    editor.putBoolean(slotHiddenKey(slot), true);
+                }
+            }
+        }
+
+        editor.apply();
+        Log.d(TAG, "slot visibility initialized: visibleSlotCount=" + initialSlotCount);
     }
 
     private boolean isSlotRequired(int slot) {
