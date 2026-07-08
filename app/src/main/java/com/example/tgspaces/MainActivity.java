@@ -55,8 +55,10 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -88,10 +90,11 @@ public class MainActivity extends AppCompatActivity {
     private static final String CATALOG_URL = "https://raw.githubusercontent.com/DesperadoBoi/TGSpaces/main/catalog/clones.json";
     private static final String APP_CATALOG_URL = "https://raw.githubusercontent.com/DesperadoBoi/TGSpaces/main/catalog/app.json";
     private static final String RELEASE_BASE_URL = "https://github.com/DesperadoBoi/TGSpaces/releases/download/v0.3-release/";
-    private static final long PROGRESS_REFRESH_MS = 1200L;
+    private static final long PROGRESS_REFRESH_MS = 1000L;
 
     private final Map<Long, Integer> downloadSlots = new HashMap<>();
     private final Map<Integer, CloneInfo> cloneCatalog = new HashMap<>();
+    private final Set<Long> processingDownloadIds = new HashSet<>();
     private final Handler progressHandler = new Handler(Looper.getMainLooper());
     private AppUpdateInfo appUpdateInfo;
     private SharedPreferences preferences;
@@ -120,6 +123,7 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void run() {
             checkDownloadsForTerminalStates(true);
+            checkAppUpdateDownload(true);
             renderSlots();
             if (hasActiveDownloads()) {
                 progressHandler.postDelayed(this, PROGRESS_REFRESH_MS);
@@ -1111,15 +1115,13 @@ public class MainActivity extends AppCompatActivity {
                 return SlotState.error(message);
             }
             if (info.status == DownloadManager.STATUS_SUCCESSFUL) {
-                markDownloadReadyForInstall(slot, downloadId, info);
+                handleDownloadedApk(downloadId, slot, true);
                 return SlotState.waitingInstall();
             }
             if (info.status == DownloadManager.STATUS_FAILED) {
-                String message = downloadReasonToMessage(info.reason);
-                storeDownloadError(slot, message);
-                logDownloadProblem(slot, downloadId, info.localUri, info.status, info.reason);
-                clearSlotDownload(slot);
-                return SlotState.error(message);
+                handleDownloadedApk(downloadId, slot, false);
+                String error = preferences.getString(slotErrorKey(slot), null);
+                return SlotState.error(error != null ? error : downloadReasonToMessage(info.reason));
             }
             if (info.status == DownloadManager.STATUS_PAUSED) {
                 return SlotState.downloading("Загрузка приостановлена", downloadReasonToMessage(info.reason));
@@ -1516,6 +1518,9 @@ public class MainActivity extends AppCompatActivity {
         if (activeDownload > 0 && isDownloadActive(activeDownload)) {
             appUpdateButton.setEnabled(false);
             appUpdateButton.setText("Скачивается...");
+        } else if (hasDownloadedAppUpdateApk()) {
+            appUpdateButton.setEnabled(true);
+            appUpdateButton.setText("Открыть установщик");
         } else {
             appUpdateButton.setEnabled(true);
             appUpdateButton.setText("Скачать обновление");
@@ -1546,6 +1551,19 @@ public class MainActivity extends AppCompatActivity {
             Log.d(TAG, "tgspaces update download already running");
             updateAppUpdateButtonState();
             Toast.makeText(this, "Обновление TGSpaces уже скачивается", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        File existingAppUpdate = existingVerifiedAppUpdateFile();
+        if (existingAppUpdate != null) {
+            Log.d(TAG, "TGSpaces update APK already verified, opening installer: path=" + existingAppUpdate.getAbsolutePath());
+            preferences.edit()
+                    .putString(KEY_APP_UPDATE_APK_PATH, existingAppUpdate.getAbsolutePath())
+                    .remove(KEY_APP_UPDATE_DOWNLOAD_ID)
+                    .remove(KEY_APP_UPDATE_DOWNLOAD_FAILED)
+                    .apply();
+            renderAppUpdateBanner();
+            openAppUpdateInstaller(existingAppUpdate);
             return;
         }
 
@@ -1581,8 +1599,22 @@ public class MainActivity extends AppCompatActivity {
                 .remove(KEY_APP_UPDATE_APK_PATH)
                 .remove(KEY_APP_UPDATE_DOWNLOAD_FAILED)
                 .apply();
+        Log.d(TAG, "TGSpaces update download enqueued: downloadId=" + downloadId);
         updateAppUpdateButtonState();
+        scheduleProgressRefreshIfNeeded();
         Toast.makeText(this, "Скачивание обновления началось", Toast.LENGTH_SHORT).show();
+    }
+
+    private boolean hasDownloadedAppUpdateApk() {
+        String savedPath = preferences.getString(KEY_APP_UPDATE_APK_PATH, null);
+        if (savedPath != null && new File(savedPath).exists()) {
+            return true;
+        }
+        if (appUpdateInfo == null) {
+            return false;
+        }
+        File downloadsDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+        return downloadsDir != null && new File(downloadsDir, appUpdateInfo.apkFileName).exists();
     }
 
     private void downloadCloneApk(int slot) {
@@ -1590,6 +1622,25 @@ public class MainActivity extends AppCompatActivity {
         if (activeDownload > 0 && isDownloadActive(activeDownload)) {
             Toast.makeText(this, "APK для этого слота уже скачивается", Toast.LENGTH_SHORT).show();
             renderSlots();
+            return;
+        }
+
+        File existingCloneApk = existingVerifiedCloneApkFile(slot);
+        if (existingCloneApk != null) {
+            Log.d(TAG, "Clone APK already verified, opening installer: slot=" + slot
+                    + ", path=" + existingCloneApk.getAbsolutePath());
+            preferences.edit()
+                    .putString(KEY_PENDING_APK, existingCloneApk.getAbsolutePath())
+                    .putInt(KEY_PENDING_SLOT, slot)
+                    .remove(KEY_PENDING_DOWNLOAD_ID)
+                    .remove(slotDownloadKey(slot))
+                    .remove(downloadSlotKey(activeDownload))
+                    .remove(slotErrorKey(slot))
+                    .remove(slotAutoOpenedKey(slot))
+                    .apply();
+            downloadSlots.remove(activeDownload);
+            renderSlots();
+            openInstallerOnce(slot, -1L);
             return;
         }
 
@@ -1628,6 +1679,7 @@ public class MainActivity extends AppCompatActivity {
                 .remove(slotErrorKey(slot))
                 .remove(slotAutoOpenedKey(slot))
                 .apply();
+        Log.d(TAG, "clone download enqueued: slot=" + slot + ", downloadId=" + downloadId);
         Toast.makeText(this, "Скачивание началось", Toast.LENGTH_SHORT).show();
         renderSlots();
     }
@@ -1675,7 +1727,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void handleDownloadedApk(long downloadId, int slot, boolean autoOpen) {
+        if (!beginDownloadProcessing(downloadId, "clone slot=" + slot + ", autoOpen=" + autoOpen)) {
+            return;
+        }
         DownloadInfo info = queryDownload(downloadId);
+        logDownloadStatus("clone terminal", downloadId, info);
         if (info == null) {
             String message = "Не удалось проверить загрузку APK";
             logDownloadProblem(slot, downloadId, null, 0, 0);
@@ -1716,20 +1772,9 @@ public class MainActivity extends AppCompatActivity {
                 continue;
             }
             if (info.status == DownloadManager.STATUS_SUCCESSFUL) {
-                if (!verifyDownloadedCloneApk(slot, info)) {
-                    storeDownloadError(slot, apkSecurityCheckErrorMessage());
-                    clearSlotDownload(slot);
-                    continue;
-                }
-                markDownloadReadyForInstall(slot, downloadId, info);
-                if (autoOpen) {
-                    openInstallerOnce(slot, downloadId);
-                }
+                handleDownloadedApk(downloadId, slot, autoOpen);
             } else if (info.status == DownloadManager.STATUS_FAILED) {
-                String message = downloadReasonToMessage(info.reason);
-                storeDownloadError(slot, message);
-                logDownloadProblem(slot, downloadId, info.localUri, info.status, info.reason);
-                clearSlotDownload(slot);
+                handleDownloadedApk(downloadId, slot, false);
             }
         }
     }
@@ -1744,6 +1789,7 @@ public class MainActivity extends AppCompatActivity {
         if (info == null) {
             return;
         }
+        logDownloadStatus("app update poll", downloadId, info);
 
         if (info.status == DownloadManager.STATUS_SUCCESSFUL) {
             handleDownloadedAppUpdate(downloadId, autoOpen);
@@ -1761,9 +1807,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void handleDownloadedAppUpdate(long downloadId, boolean autoOpen) {
+        if (!beginDownloadProcessing(downloadId, "app update, autoOpen=" + autoOpen)) {
+            return;
+        }
         DownloadInfo info = queryDownload(downloadId);
+        logDownloadStatus("app update terminal", downloadId, info);
         if (info == null) {
             Log.w(TAG, "Could not query TGSpaces update download: downloadId=" + downloadId);
+            processingDownloadIds.remove(downloadId);
             return;
         }
 
@@ -1821,6 +1872,65 @@ public class MainActivity extends AppCompatActivity {
         if (autoOpen) {
             openAppUpdateInstaller(apkFile);
         }
+    }
+
+    private File existingVerifiedAppUpdateFile() {
+        if (appUpdateInfo == null) {
+            return null;
+        }
+
+        File file = null;
+        String savedPath = preferences.getString(KEY_APP_UPDATE_APK_PATH, null);
+        if (savedPath != null) {
+            File savedFile = new File(savedPath);
+            if (savedFile.exists()) {
+                file = savedFile;
+            }
+        }
+
+        if (file == null) {
+            File downloadsDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+            if (downloadsDir != null) {
+                File expected = new File(downloadsDir, appUpdateInfo.apkFileName);
+                if (expected.exists()) {
+                    file = expected;
+                }
+            }
+        }
+
+        if (file == null) {
+            return null;
+        }
+
+        if (verifyApkSha256("TGSpaces update existing", appUpdateInfo.sha256, Uri.fromFile(file), null)) {
+            return file;
+        }
+
+        Log.w(TAG, "Existing TGSpaces update APK failed SHA check, deleting: path=" + file.getAbsolutePath());
+        if (!file.delete()) {
+            Log.w(TAG, "Could not delete invalid TGSpaces update APK: path=" + file.getAbsolutePath());
+        }
+        preferences.edit().remove(KEY_APP_UPDATE_APK_PATH).apply();
+        return null;
+    }
+
+    private File existingVerifiedCloneApkFile(int slot) {
+        File file = expectedApkFile(slot);
+        if (!file.exists()) {
+            return null;
+        }
+
+        if (verifyApkSha256("slot=" + slot + " existing", expectedCloneSha256(slot), Uri.fromFile(file), slot)) {
+            return file;
+        }
+
+        Log.w(TAG, "Existing clone APK failed SHA check, deleting: slot=" + slot
+                + ", path=" + file.getAbsolutePath());
+        if (!file.delete()) {
+            Log.w(TAG, "Could not delete invalid clone APK: slot=" + slot
+                    + ", path=" + file.getAbsolutePath());
+        }
+        return null;
     }
 
     private File resolveDownloadedAppUpdateFile(DownloadInfo info) {
@@ -2011,7 +2121,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private boolean hasActiveDownloads() {
-        for (int slot = 1; slot <= visibleSlotCount; slot++) {
+        long appUpdateDownloadId = preferences.getLong(KEY_APP_UPDATE_DOWNLOAD_ID, -1L);
+        if (appUpdateDownloadId > 0 && isDownloadActive(appUpdateDownloadId)) {
+            return true;
+        }
+        for (int slot = 1; slot <= MAX_CLONE_APKS; slot++) {
             long downloadId = preferences.getLong(slotDownloadKey(slot), -1L);
             if (downloadId > 0 && isDownloadActive(downloadId)) {
                 return true;
@@ -2025,6 +2139,37 @@ public class MainActivity extends AppCompatActivity {
         if (hasActiveDownloads()) {
             progressHandler.postDelayed(progressRunnable, PROGRESS_REFRESH_MS);
         }
+    }
+
+    private boolean beginDownloadProcessing(long downloadId, String source) {
+        if (downloadId <= 0) {
+            return true;
+        }
+        if (processingDownloadIds.contains(downloadId)) {
+            Log.d(TAG, "download already being processed: downloadId=" + downloadId
+                    + ", source=" + source);
+            return false;
+        }
+        processingDownloadIds.add(downloadId);
+        Log.d(TAG, "download processing started: downloadId=" + downloadId
+                + ", source=" + source);
+        return true;
+    }
+
+    private void logDownloadStatus(String source, long downloadId, DownloadInfo info) {
+        if (info == null) {
+            Log.d(TAG, "DownloadManager status: source=" + source
+                    + ", downloadId=" + downloadId
+                    + ", status=null");
+            return;
+        }
+        Log.d(TAG, "DownloadManager status: source=" + source
+                + ", downloadId=" + downloadId
+                + ", status=" + info.status
+                + ", reason=" + info.reason
+                + ", downloadedBytes=" + info.downloadedBytes
+                + ", totalBytes=" + info.totalBytes
+                + ", localUri=" + info.localUri);
     }
 
     private void showDownloadError(int slot, String message) {
